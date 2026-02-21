@@ -538,16 +538,17 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInAnonymously, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, update, onValue, onDisconnect, serverTimestamp, push }
+import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverTimestamp, push }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -979,6 +980,7 @@ window.createRoom = async function() {
   await ensureAuth();
   const id = genRoomId();
   roomId = id;
+  myColor = 'white';
   gameRef = ref(db, `games/${id}`);
   const initialBoard = initBoard();
   await set(gameRef, {
@@ -992,10 +994,9 @@ window.createRoom = async function() {
     lastTo:   'null',
     players: { white: uid }
   });
-  myColor = 'white';
   setupDisconnect();
   document.getElementById('join-screen').classList.add('hidden');
-  document.getElementById('your-color-display').textContent = '⬜ WHITE';
+  document.getElementById('your-color-display').textContent = 'WHITE';
   document.getElementById('room-code-display').textContent  = id;
   document.getElementById('wait-screen').classList.remove('hidden');
   startWaitDots();
@@ -1008,13 +1009,14 @@ window.joinRoom = async function() {
   showConnecting();
   await ensureAuth();
   const snap = await get(ref(db, `games/${input}`));
-  if (!snap.exists()) { alert('Room not found.'); hideConnecting(); return; }
+  if (!snap.exists()) { alert('Room not found. Check the code and try again.'); hideConnecting(); return; }
   const data = snap.val();
-  if (data.status !== 'waiting' || data.players?.black) { alert('Room is full or game in progress.'); hideConnecting(); return; }
+  if (data.status !== 'waiting' || data.players?.black) { alert('Room is full or already in progress.'); hideConnecting(); return; }
   roomId = input;
-  gameRef = ref(db, `games/${input}`);
-  await update(gameRef, { 'players/black': uid, status: 'active' });
   myColor = 'black';
+  gameRef = ref(db, `games/${input}`);
+  // Write black player and flip status to active BEFORE setting up listener
+  await update(gameRef, { 'players/black': uid, status: 'active' });
   setupDisconnect();
   document.getElementById('join-screen').classList.add('hidden');
   listenToGame();
@@ -1026,38 +1028,37 @@ function setupDisconnect() {
 }
 
 function listenToGame() {
-  buildBoardUI();
   onValue(gameRef, snap => {
     if (!snap.exists()) return;
     const d = snap.val();
 
-    // Always update player status indicators
-    document.getElementById('status-white').textContent =
-      d.players?.white ? 'online' : 'offline';
-    document.getElementById('status-black').textContent =
-      d.players?.black ? 'online' : 'offline';
+    // Update online indicators
+    document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
+    document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
 
+    // Still waiting for second player
     if (d.status === 'waiting') {
       updateStatus('WAITING FOR OPPONENT...');
       return;
     }
 
-    // Game is active or complete - enable everything
+    // ── GAME IS ACTIVE ──
+    // Always hide lobby screens and activate the game
     document.getElementById('wait-screen').classList.add('hidden');
     document.getElementById('join-screen').classList.add('hidden');
     stopWaitDots();
     gameActive = true;
 
-    // Sync all state from Firebase
-    board          = JSON.parse(d.board);
-    turn           = d.turn;
-    capturedByWhite= JSON.parse(d.capturedByWhite || '[]');
-    capturedByBlack= JSON.parse(d.capturedByBlack || '[]');
-    moveLog        = JSON.parse(d.moveLog || '[]');
-    lastFrom       = JSON.parse(d.lastFrom || 'null');
-    lastTo         = JSON.parse(d.lastTo   || 'null');
-    selected       = null;
-    validMoves     = [];
+    // Parse state from Firebase
+    board           = JSON.parse(d.board);
+    turn            = d.turn;
+    capturedByWhite = JSON.parse(d.capturedByWhite || '[]');
+    capturedByBlack = JSON.parse(d.capturedByBlack || '[]');
+    moveLog         = JSON.parse(d.moveLog || '[]');
+    lastFrom        = JSON.parse(d.lastFrom || 'null');
+    lastTo          = JSON.parse(d.lastTo   || 'null');
+    selected        = null;
+    validMoves      = [];
 
     renderBoard();
     updateSidePanels();
@@ -1066,8 +1067,7 @@ function listenToGame() {
 
     checkGameEnd();
 
-    // Status bar
-    const myTurn = turn === myColor;
+    const myTurn  = (turn === myColor);
     const inCheck = isInCheck(board, turn[0]);
     if (inCheck) {
       updateStatus('CHECK! ' + turn.toUpperCase() + (myTurn ? ' - YOUR MOVE' : ''));
@@ -1117,6 +1117,8 @@ window.copyRoomCode = function() {
 };
 
 window.resetToLobby = function() {
+  // Detach Firebase listener if active
+  if (gameRef) { off(gameRef); }
   gameActive = false; myColor = null; roomId = null; gameRef = null;
   board = []; selected = null; validMoves = []; turn = 'white';
   capturedByWhite = []; capturedByBlack = []; moveLog = [];
@@ -1125,6 +1127,8 @@ window.resetToLobby = function() {
   document.getElementById('join-screen').classList.remove('hidden');
   hideConnecting();
   document.getElementById('room-input').value = '';
+  buildBoardUI(); // Rebuild fresh board with new listeners
+  updateStatus('ENTER ROOM CODE OR CREATE NEW GAME');
 };
 
 // ─── Init ────────────────────────────────────────────────────
