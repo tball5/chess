@@ -205,14 +205,26 @@
   }
   .piece-w {
     color: #ffffff;
-    -webkit-text-stroke: 2.5px #000;
-    text-shadow: 0 0 8px #fff, 0 0 2px #fff;
-    filter: drop-shadow(2px 2px 0 #000) drop-shadow(-1px -1px 0 #000) drop-shadow(1px -1px 0 #000) drop-shadow(-1px 1px 0 #000);
+    -webkit-text-stroke: 3px #000000;
+    paint-order: stroke fill;
+    text-shadow:
+      0 0 1px #000, 0 0 1px #000,
+      0 0 10px rgba(255,255,255,0.8),
+      0 0 20px rgba(255,255,255,0.4);
+    filter:
+      drop-shadow(2px 2px 0px #000)
+      drop-shadow(-2px -2px 0px #000)
+      drop-shadow(2px -2px 0px #000)
+      drop-shadow(-2px 2px 0px #000)
+      drop-shadow(0 0 8px rgba(255,255,255,0.6));
   }
   .piece-b {
-    color: #0a0a0a;
-    -webkit-text-stroke: 2px #666;
-    filter: drop-shadow(1px 1px 0 #444) drop-shadow(-1px -1px 0 #222);
+    color: #1a1a1a;
+    -webkit-text-stroke: 2px #777777;
+    paint-order: stroke fill;
+    filter:
+      drop-shadow(1px 1px 0px #888)
+      drop-shadow(-1px -1px 0px #555);
   }
   .sq:active .piece { transform: scale(0.9); }
 
@@ -530,12 +542,13 @@ import { getDatabase, ref, set, get, update, onValue, onDisconnect, serverTimest
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -796,7 +809,9 @@ function toAlgebraic(piece, fr, fc, tr, tc, cap, promo) {
 // ─── Move generation ─────────────────────────────────────────
 function cloneBoard(b) { return b.map(row => [...row]); }
 
-function getRawMoves(b, r, c, color) {
+// skipCastling flag prevents infinite recursion:
+// getRawMoves (King) -> isInCheck -> getRawMoves -> isInCheck ...
+function getRawMoves(b, r, c, color, skipCastling) {
   const p = b[r][c];
   if (!p || pieceColor(p) !== color) return [];
   const type = pieceType(p);
@@ -812,7 +827,7 @@ function getRawMoves(b, r, c, color) {
       while (inBounds(nr,nc)) {
         if (friendly(nr,nc)) break;
         moves.push([nr,nc]);
-        if (b[nr][nc]) break; // blocked by enemy after capture
+        if (b[nr][nc]) break;
         nr += dr; nc += dc;
       }
     });
@@ -830,8 +845,8 @@ function getRawMoves(b, r, c, color) {
   if (type==='N') jump([[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]);
   if (type==='K') {
     jump([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
-    // Castling — only when not currently in check
-    if (!isInCheck(b, color)) {
+    // Castling — skipped when called from isInCheck to prevent infinite recursion
+    if (!skipCastling && !isInCheck(b, color)) {
       if (color==='w' && r===7 && c===4) {
         if (b[7][7]==='wR' && !b[7][5] && !b[7][6]) moves.push([7,6]);
         if (b[7][0]==='wR' && !b[7][1] && !b[7][2] && !b[7][3]) moves.push([7,2]);
@@ -843,18 +858,14 @@ function getRawMoves(b, r, c, color) {
     }
   }
   if (type==='P') {
-    // White moves UP the board (decreasing row index), black moves DOWN
     const dir   = color==='w' ? -1 : 1;
     const start = color==='w' ? 6   : 1;
-    // Single step forward
     if (empty(r+dir, c)) {
       moves.push([r+dir, c]);
-      // Double step from starting rank
       if (r === start && empty(r+2*dir, c)) {
         moves.push([r+2*dir, c]);
       }
     }
-    // Diagonal captures
     [-1, 1].forEach(dc => {
       if (enemy(r+dir, c+dc)) moves.push([r+dir, c+dc]);
     });
@@ -862,11 +873,26 @@ function getRawMoves(b, r, c, color) {
   return moves;
 }
 
+function isInCheck(b, color) {
+  const king = findKingIn(b, color);
+  if (!king) return false;
+  const ocolor = opp(color);
+  for (let r=0; r<8; r++) {
+    for (let c=0; c<8; c++) {
+      if (pieceColor(b[r][c]) === ocolor) {
+        // Pass skipCastling=true to avoid infinite recursion
+        const attacks = getRawMoves(b, r, c, ocolor, true);
+        if (attacks.some(([tr,tc]) => tr===king[0] && tc===king[1])) return true;
+      }
+    }
+  }
+  return false;
+}
+
 function getLegalMoves(b, r, c, color) {
-  const raw = getRawMoves(b, r, c, color);
+  const raw = getRawMoves(b, r, c, color, false);
   return raw.filter(([tr, tc]) => {
     const next = cloneBoard(b);
-    // Handle castling rook move in simulation
     const piece = next[r][c];
     if (pieceType(piece) === 'K' && Math.abs(tc - c) === 2) {
       if (tc === 6) { next[r][7] = null; next[r][5] = color + 'R'; }
@@ -878,17 +904,7 @@ function getLegalMoves(b, r, c, color) {
   });
 }
 
-function isInCheck(b, color) {
-  const king = findKingIn(b, color);
-  if (!king) return false;
-  const ocolor = opp(color);
-  for (let r=0;r<8;r++) for(let c=0;c<8;c++) {
-    if(pieceColor(b[r][c])===ocolor) {
-      if(getRawMoves(b,r,c,ocolor).some(([tr,tc])=>tr===king[0]&&tc===king[1])) return true;
-    }
-  }
-  return false;
-}
+
 
 function findKingIn(b, color) {
   for(let r=0;r<8;r++) for(let c=0;c<8;c++)
