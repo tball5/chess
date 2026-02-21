@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>CHESS // TERMINAL</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
@@ -416,13 +416,177 @@
     pointer-events: none;
   }
 
-  @media (max-width: 600px) {
-    .side-panel { width: 120px; font-size: 10px; }
-    .side-panel .section-label { font-size: 8px; }
-    #game-area { gap: 8px; }
-  }
-  @media (max-width: 480px) {
-    .side-panel { display: none; }
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+
+    html, body { overflow: hidden; height: 100%; height: 100dvh; }
+
+    #app {
+      height: 100dvh;
+      padding: 0;
+      gap: 0;
+      justify-content: space-between;
+    }
+
+    /* Compact header strip */
+    #header {
+      width: 100%;
+      padding: 8px 12px 4px;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #header h1 {
+      font-size: 13px;
+      letter-spacing: 0.15em;
+    }
+    #header .sub { display: none; }
+
+    /* Status bar pinned above board */
+    #status-bar {
+      width: 100%;
+      min-width: unset;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      padding: 7px 12px;
+      flex-shrink: 0;
+    }
+
+    /* Game area: stack vertically, board fills middle */
+    #game-area {
+      flex: 1;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      gap: 0;
+      padding: 4px 0;
+    }
+
+    /* Hide side panels entirely on mobile */
+    .side-panel { display: none !important; }
+
+    /* Board wrap and board fill available space */
+    #board-wrap {
+      gap: 2px;
+      width: 100%;
+      align-items: center;
+    }
+
+    /* Coordinates scaled down */
+    .coord-row {
+      width: 10px;
+      font-size: 7px;
+      height: min(96vw, 96vh - 140px) !important;
+    }
+    .coord-col {
+      font-size: 7px;
+      width: min(96vw, 96vh - 140px) !important;
+    }
+
+    /* Board: use almost full viewport width, keep square */
+    #board {
+      width: min(96vw, calc(100dvh - 140px));
+      height: min(96vw, calc(100dvh - 140px));
+      border-width: 1px;
+      touch-action: manipulation;
+    }
+
+    /* Bigger tap targets, larger pieces */
+    .sq {
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    .sq:active { opacity: 0.85; }
+
+    .piece {
+      font-size: clamp(22px, 10vw, 52px);
+    }
+
+    /* Larger valid move dots */
+    .sq.valid-move::after {
+      width: 36%; height: 36%;
+    }
+
+    /* Lobby screens */
+    .screen-box {
+      padding: 24px 20px;
+      width: 92%;
+    }
+    .screen-box h2 { font-size: 16px; }
+    .screen-box p  { font-size: 11px; }
+
+    .btn {
+      font-size: 14px;
+      padding: 14px 20px;
+      border-radius: 6px;
+      /* Bigger tap target */
+      min-height: 48px;
+    }
+    .btn.secondary {
+      font-size: 12px;
+      min-height: 44px;
+    }
+
+    .input-field {
+      font-size: 18px; /* Prevents iOS zoom on focus */
+      padding: 14px 16px;
+      min-height: 48px;
+      border-radius: 6px;
+      letter-spacing: 0.2em;
+      text-align: center;
+    }
+
+    .room-id-display {
+      font-size: 18px;
+      letter-spacing: 0.25em;
+      padding: 12px;
+      margin-top: 12px;
+    }
+
+    /* Promotion modal bigger buttons on mobile */
+    .promo-btn {
+      font-size: 48px;
+      padding: 14px;
+      min-width: 60px;
+      min-height: 60px;
+    }
+
+    /* Mobile player strip at bottom of screen */
+    #mobile-bar {
+      display: flex !important;
+      width: 100%;
+      background: rgba(0,0,0,0.7);
+      backdrop-filter: blur(6px);
+      border-top: 1px solid var(--border);
+      padding: 6px 16px;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .mobile-player {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: 'Share Tech Mono', monospace;
+    }
+    .mobile-player .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .mobile-player.active { color: var(--green); }
+    .mobile-player.inactive { color: var(--green-dim); opacity: 0.6; }
+    .mobile-you-tag {
+      font-size: 9px;
+      color: var(--green-dim);
+      letter-spacing: 0.1em;
+    }
   }
 </style>
 </head>
@@ -528,6 +692,25 @@
   </div>
 
   <div id="status-bar">INITIALIZING...</div>
+
+  <!-- Mobile player strip (hidden on desktop, shown on mobile via CSS) -->
+  <div id="mobile-bar" style="display:none;">
+    <div class="mobile-player" id="mobile-white">
+      <div class="dot" style="background:#fff;box-shadow:0 0 4px #fff;"></div>
+      <div>
+        <div id="mobile-name-white">WHITE</div>
+        <div class="mobile-you-tag" id="mobile-status-white"></div>
+      </div>
+    </div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:0.15em;color:var(--green-dim);">VS</div>
+    <div class="mobile-player" id="mobile-black" style="flex-direction:row-reverse;text-align:right;">
+      <div class="dot" style="background:#333;border:1px solid #666;box-shadow:0 0 4px #555;"></div>
+      <div>
+        <div id="mobile-name-black">BLACK</div>
+        <div class="mobile-you-tag" id="mobile-status-black"></div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════ -->
@@ -542,13 +725,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -626,6 +809,8 @@ function buildBoardUI() {
       sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
       sq.dataset.r = r; sq.dataset.c = c;
       sq.addEventListener('click', () => onSquareClick(r, c));
+      // touchend fires faster than click on mobile, prevents 300ms delay
+      sq.addEventListener('touchend', (e) => { e.preventDefault(); onSquareClick(r, c); });
       boardEl.appendChild(sq);
     }
   }
@@ -972,6 +1157,19 @@ function updateSidePanels() {
   // Show YOU tag on the correct card
   document.getElementById('name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
   document.getElementById('name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
+  // Update mobile bar
+  const mw = document.getElementById('mobile-white');
+  const mb = document.getElementById('mobile-black');
+  if (mw) {
+    mw.className = 'mobile-player ' + (turn === 'white' ? 'active' : 'inactive');
+    document.getElementById('mobile-name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
+    document.getElementById('mobile-status-white').textContent = turn === 'white' ? 'YOUR TURN' : '';
+  }
+  if (mb) {
+    mb.className = 'mobile-player ' + (turn === 'black' ? 'active' : 'inactive');
+    document.getElementById('mobile-name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
+    document.getElementById('mobile-status-black').textContent = turn === 'black' ? 'YOUR TURN' : '';
+  }
 
   document.getElementById('captured-by-white').textContent =
     capturedByBlack.map(p => PIECES[p]||'').join('');
