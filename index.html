@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CHESS // TERMINAL</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green: #00ff88;
+    --green-dim: #00cc66;
+    --green-dark: #003322;
+    --bg: #0a0a0a;
+    --panel-bg: rgba(0,20,10,0.85);
+    --border: rgba(0,255,136,0.25);
+    --light-sq: #0d2e1a;
+    --dark-sq: #040f08;
+    --light-sq-hover: #1a5c35;
+    --dark-sq-hover: #0a2214;
+    --selected: rgba(0,255,136,0.35);
+    --valid-move: rgba(0,255,136,0.2);
+    --check: rgba(255,50,50,0.5);
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    font-family: 'Share Tech Mono', monospace;
+    color: var(--green);
+    overflow: hidden;
+  }
+
+  /* Matrix rain canvas passed through */
+  #rain-canvas {
+    position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  #app {
+    position: relative; z-index: 10;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100vh; gap: 12px;
+    padding: 16px;
+  }
+
+  /* ── Header ── */
+  #header {
+    text-align: center;
+  }
+  #header h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(18px, 3vw, 28px);
+    font-weight: 900;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    text-shadow: 0 0 20px var(--green), 0 0 60px var(--green-dim);
+    animation: pulse 3s ease-in-out infinite;
+  }
+  #header .sub {
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--green-dim);
+    margin-top: 2px;
+  }
+  @keyframes pulse {
+    0%,100% { text-shadow: 0 0 20px var(--green), 0 0 40px var(--green-dim); }
+    50% { text-shadow: 0 0 30px var(--green), 0 0 80px var(--green-dim), 0 0 120px var(--green); }
+  }
+
+  /* ── Main game area ── */
+  #game-area {
+    display: flex;
+    gap: 16px;
+    align-items: center;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  /* ── Side panels ── */
+  .side-panel {
+    width: 160px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 12px;
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 12px;
+  }
+  .side-panel .section-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--green-dim);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+    margin-bottom: 2px;
+  }
+  .player-card {
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    background: rgba(0,255,136,0.03);
+    transition: all 0.3s;
+  }
+  .player-card.active-turn {
+    border-color: var(--green);
+    background: rgba(0,255,136,0.08);
+    box-shadow: 0 0 12px rgba(0,255,136,0.15);
+  }
+  .player-card .color-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 6px;
+    vertical-align: middle;
+    box-shadow: 0 0 6px currentColor;
+  }
+  .player-card .color-dot.white { background: #fff; color: #fff; }
+  .player-card .color-dot.black { background: #333; color: #333; border: 1px solid #555; }
+  .player-card .name { font-size: 11px; }
+  .player-card .status { font-size: 10px; color: var(--green-dim); margin-top: 3px; }
+
+  .captured-pieces { min-height: 40px; letter-spacing: 1px; line-height: 1.6; font-size: 14px; }
+
+  /* Move log */
+  #move-log-list {
+    max-height: 120px;
+    overflow-y: auto;
+    font-size: 10px;
+    line-height: 1.8;
+    color: var(--green-dim);
+    scrollbar-width: thin;
+    scrollbar-color: var(--green-dim) transparent;
+  }
+  #move-log-list::-webkit-scrollbar { width: 3px; }
+  #move-log-list::-webkit-scrollbar-thumb { background: var(--green-dim); }
+
+  /* ── Chess Board ── */
+  #board-wrap {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  #board {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(8, 1fr);
+    width: min(52vmin, 440px);
+    height: min(52vmin, 440px);
+    border: 2px solid var(--green-dim);
+    box-shadow: 0 0 30px rgba(0,255,136,0.25), 0 0 80px rgba(0,255,136,0.08), inset 0 0 20px rgba(0,0,0,0.8);
+    border-radius: 2px;
+  }
+
+  .sq {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+  }
+  .sq.light { background: var(--light-sq); }
+  .sq.dark  { background: var(--dark-sq); }
+  .sq.light:hover { background: var(--light-sq-hover); }
+  .sq.dark:hover  { background: var(--dark-sq-hover); }
+  .sq.selected { background: var(--selected) !important; box-shadow: inset 0 0 0 2px var(--green); }
+  .sq.valid-move::after {
+    content: '';
+    position: absolute;
+    width: 30%; height: 30%;
+    border-radius: 50%;
+    background: var(--green);
+    opacity: 0.5;
+    box-shadow: 0 0 8px var(--green);
+  }
+  .sq.valid-capture::after {
+    content: '';
+    position: absolute;
+    inset: 2px;
+    border-radius: 1px;
+    border: 2px solid var(--green);
+    opacity: 0.6;
+  }
+  .sq.in-check { background: var(--check) !important; }
+  .sq.last-move { background: rgba(0,255,136,0.12) !important; }
+
+  /* Piece */
+  .piece {
+    font-size: clamp(20px, 4.5vmin, 38px);
+    line-height: 1;
+    z-index: 2;
+    transition: transform 0.1s;
+    filter: drop-shadow(0 0 4px rgba(0,255,136,0.4));
+    pointer-events: none;
+  }
+  .sq:active .piece { transform: scale(0.9); }
+
+  /* Board coordinates */
+  .coord-row, .coord-col {
+    display: flex;
+    font-size: 9px;
+    color: rgba(0,255,136,0.35);
+    letter-spacing: 0.1em;
+  }
+  .coord-row { flex-direction: column; justify-content: space-around; height: min(52vmin, 440px); width: 14px; align-items: center; }
+  .coord-col { width: min(52vmin, 440px); justify-content: space-around; height: 14px; }
+
+  /* ── Status bar ── */
+  #status-bar {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(10px, 1.5vw, 13px);
+    letter-spacing: 0.15em;
+    text-align: center;
+    color: var(--green);
+    padding: 6px 20px;
+    border: 1px solid var(--border);
+    background: var(--panel-bg);
+    border-radius: 3px;
+    min-width: 260px;
+    backdrop-filter: blur(8px);
+    animation: statusPulse 1s ease-in-out;
+  }
+  @keyframes statusPulse {
+    from { opacity: 0; transform: translateY(4px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Screens ── */
+  .screen {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 24px;
+    background: rgba(0,0,0,0.88);
+    backdrop-filter: blur(4px);
+  }
+  .screen.hidden { display: none; }
+
+  .screen-box {
+    background: var(--panel-bg);
+    border: 1px solid var(--green-dim);
+    border-radius: 4px;
+    padding: 32px 40px;
+    text-align: center;
+    box-shadow: 0 0 40px rgba(0,255,136,0.15);
+    max-width: 400px;
+    width: 90%;
+    animation: fadeIn 0.4s ease;
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .screen-box h2 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 20px;
+    letter-spacing: 0.25em;
+    margin-bottom: 8px;
+    text-shadow: 0 0 20px var(--green);
+  }
+  .screen-box p {
+    font-size: 12px;
+    color: var(--green-dim);
+    margin-bottom: 20px;
+    line-height: 1.7;
+  }
+  .btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.2em;
+    padding: 12px 28px;
+    border: 1px solid var(--green);
+    background: rgba(0,255,136,0.07);
+    color: var(--green);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .btn:hover {
+    background: rgba(0,255,136,0.18);
+    box-shadow: 0 0 20px rgba(0,255,136,0.3);
+    transform: translateY(-1px);
+  }
+  .btn:active { transform: translateY(0); }
+  .btn.secondary {
+    border-color: var(--green-dim);
+    color: var(--green-dim);
+    background: transparent;
+    font-size: 11px;
+    padding: 8px 20px;
+  }
+  .btn.secondary:hover {
+    border-color: var(--green);
+    color: var(--green);
+    box-shadow: none;
+  }
+
+  .room-id-display {
+    font-size: 11px;
+    color: var(--green-dim);
+    margin-top: 16px;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+  .room-id-display:hover { border-color: var(--green-dim); color: var(--green); }
+
+  .input-field {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    padding: 10px 14px;
+    background: rgba(0,20,10,0.8);
+    border: 1px solid var(--green-dim);
+    color: var(--green);
+    border-radius: 3px;
+    width: 100%;
+    margin-bottom: 12px;
+    letter-spacing: 0.1em;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .input-field:focus { border-color: var(--green); box-shadow: 0 0 10px rgba(0,255,136,0.15); }
+  .input-field::placeholder { color: rgba(0,255,136,0.3); }
+
+  #connecting-dots::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0%   { content: ''; }
+    25%  { content: '.'; }
+    50%  { content: '..'; }
+    75%  { content: '...'; }
+    100% { content: ''; }
+  }
+
+  /* Promotion modal */
+  #promo-modal {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(0,0,0,0.7);
+  }
+  #promo-modal.hidden { display: none; }
+  #promo-choices {
+    background: var(--panel-bg);
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    padding: 20px;
+    display: flex; gap: 12px;
+    box-shadow: 0 0 40px rgba(0,255,136,0.3);
+  }
+  .promo-btn {
+    font-size: 36px;
+    padding: 10px;
+    background: rgba(0,255,136,0.07);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s;
+    filter: drop-shadow(0 0 4px rgba(0,255,136,0.4));
+  }
+  .promo-btn:hover {
+    background: rgba(0,255,136,0.18);
+    border-color: var(--green);
+    box-shadow: 0 0 15px rgba(0,255,136,0.3);
+  }
+
+  /* Scanline overlay */
+  #app::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 5;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+    pointer-events: none;
+  }
+
+  @media (max-width: 600px) {
+    .side-panel { width: 120px; font-size: 10px; }
+    .side-panel .section-label { font-size: 8px; }
+    #game-area { gap: 8px; }
+  }
+  @media (max-width: 480px) {
+    .side-panel { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Matrix Rain Canvas (from your existing code) -->
+<canvas id="rain-canvas"></canvas>
+
+<!-- ── JOIN/CREATE SCREEN ── -->
+<div id="join-screen" class="screen">
+  <div class="screen-box">
+    <h2>// CHESS TERMINAL</h2>
+    <p>Anonymous auth — no account needed.<br>Two players per room maximum.</p>
+    <div id="join-options">
+      <button class="btn" onclick="createRoom()" style="width:100%;margin-bottom:10px;">[ CREATE NEW GAME ]</button>
+      <input id="room-input" class="input-field" type="text" placeholder="Enter room code to join..." maxlength="6">
+      <button class="btn secondary" onclick="joinRoom()" style="width:100%;">[ JOIN EXISTING GAME ]</button>
+    </div>
+    <div id="connecting-msg" style="display:none; color:var(--green-dim); font-size:12px;">
+      Connecting<span id="connecting-dots"></span>
+    </div>
+  </div>
+</div>
+
+<!-- ── WAITING SCREEN ── -->
+<div id="wait-screen" class="screen hidden">
+  <div class="screen-box">
+    <h2>AWAITING OPPONENT</h2>
+    <p>You are playing as <span id="your-color-display" style="color:var(--green);font-weight:bold;"></span><br>Share this code with your opponent:</p>
+    <div id="share-room-code" class="room-id-display" onclick="copyRoomCode()" title="Click to copy">
+      🔑 <span id="room-code-display"></span> — click to copy
+    </div>
+    <p style="margin-top:16px;font-size:11px;">Waiting for player 2<span id="wait-dots"></span></p>
+  </div>
+</div>
+
+<!-- ── GAME OVER SCREEN ── -->
+<div id="gameover-screen" class="screen hidden">
+  <div class="screen-box">
+    <h2 id="gameover-title">GAME OVER</h2>
+    <p id="gameover-msg"></p>
+    <button class="btn" onclick="resetToLobby()">[ PLAY AGAIN ]</button>
+  </div>
+</div>
+
+<!-- ── PROMOTION MODAL ── -->
+<div id="promo-modal" class="hidden">
+  <div id="promo-choices"></div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app">
+  <div id="header">
+    <h1>// CHESS TERMINAL //</h1>
+    <div class="sub">REALTIME · ANONYMOUS · ENCRYPTED</div>
+  </div>
+
+  <div id="game-area">
+    <!-- Left panel: Black player -->
+    <div class="side-panel" id="panel-black">
+      <div>
+        <div class="section-label">PLAYER_02</div>
+        <div class="player-card" id="card-black">
+          <span class="color-dot black"></span>
+          <span class="name">BLACK</span>
+          <div class="status" id="status-black">waiting...</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">CAPTURED</div>
+        <div class="captured-pieces" id="captured-by-black"></div>
+      </div>
+    </div>
+
+    <!-- Board -->
+    <div id="board-wrap">
+      <div class="coord-col" id="coord-cols"></div>
+      <div style="display:flex;">
+        <div class="coord-row" id="coord-rows"></div>
+        <div id="board"></div>
+      </div>
+    </div>
+
+    <!-- Right panel: White player + moves -->
+    <div class="side-panel" id="panel-white">
+      <div>
+        <div class="section-label">PLAYER_01</div>
+        <div class="player-card" id="card-white">
+          <span class="color-dot white"></span>
+          <span class="name">WHITE</span>
+          <div class="status" id="status-white">waiting...</div>
+        </div>
+      </div>
+      <div>
+        <div class="section-label">CAPTURED</div>
+        <div class="captured-pieces" id="captured-by-white"></div>
+      </div>
+      <div>
+        <div class="section-label">MOVE_LOG</div>
+        <div id="move-log-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="status-bar">INITIALIZING...</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!--  FIREBASE  (replace config with yours)                    -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script type="module">
+// ─── REPLACE THIS WITH YOUR FIREBASE CONFIG ───────────────────
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, get, update, onValue, onDisconnect, serverTimestamp, push }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+// ──────────────────────────────────────────────────────────────
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getDatabase(app);
+
+// ─── State ────────────────────────────────────────────────────
+let uid = null, myColor = null, roomId = null, gameRef = null;
+let board = [], selected = null, validMoves = [], turn = 'white';
+let capturedByWhite = [], capturedByBlack = [], moveLog = [];
+let gameActive = false, lastFrom = null, lastTo = null;
+let waitDotsInterval = null;
+let pendingPromotion = null;
+
+// ─── Pieces ──────────────────────────────────────────────────
+const PIECES = {
+  wK:'♔', wQ:'♕', wR:'♖', wB:'♗', wN:'♘', wP:'♙',
+  bK:'♚', bQ:'♛', bR:'♜', bB:'♝', bN:'♞', bP:'♟'
+};
+
+function pieceColor(p) { return p ? p[0] : null; }
+function pieceType(p)  { return p ? p[1] : null; }
+function opp(c)        { return c === 'w' ? 'b' : 'w'; }
+
+function initBoard() {
+  const b = Array(8).fill(null).map(() => Array(8).fill(null));
+  const back = ['R','N','B','Q','K','B','N','R'];
+  for (let c = 0; c < 8; c++) {
+    b[0][c] = 'b' + back[c];
+    b[1][c] = 'bP';
+    b[6][c] = 'wP';
+    b[7][c] = 'w' + back[c];
+  }
+  return b;
+}
+
+// ─── Matrix Rain (your existing code) ────────────────────────
+const rainCanvas = document.getElementById('rain-canvas');
+const ctx = rainCanvas.getContext('2d');
+rainCanvas.width  = window.innerWidth;
+rainCanvas.height = window.innerHeight;
+const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:\'",.<>?/～!！@#￥%……&*（）——+【】｛｝；：＂＇，。、《》？';
+const fontSize = 14;
+let columns = Math.floor(rainCanvas.width / fontSize);
+let drops = Array(columns).fill(1);
+function drawRain() {
+  ctx.fillStyle = 'rgba(10,10,10,0.08)';
+  ctx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
+  ctx.fillStyle = '#00ff88';
+  ctx.font = fontSize + 'px monospace';
+  for (let i = 0; i < drops.length; i++) {
+    ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i*fontSize, drops[i]*fontSize);
+    if (drops[i]*fontSize > rainCanvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  }
+}
+setInterval(drawRain, 45);
+window.addEventListener('resize', () => {
+  rainCanvas.width  = window.innerWidth;
+  rainCanvas.height = window.innerHeight;
+  columns = Math.floor(rainCanvas.width / fontSize);
+  drops   = Array(columns).fill(1);
+});
+
+// ─── Build board UI ──────────────────────────────────────────
+function buildBoardUI() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  const cols = document.getElementById('coord-cols');
+  const rows = document.getElementById('coord-rows');
+  cols.innerHTML = '';
+  rows.innerHTML = '';
+
+  const files = ['a','b','c','d','e','f','g','h'];
+  const ranks = ['8','7','6','5','4','3','2','1'];
+  files.forEach(f => { const s=document.createElement('span');s.textContent=f;cols.appendChild(s); });
+  ranks.forEach(r => { const s=document.createElement('span');s.textContent=r;rows.appendChild(s); });
+
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const sq = document.createElement('div');
+      sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
+      sq.dataset.r = r; sq.dataset.c = c;
+      sq.addEventListener('click', () => onSquareClick(r, c));
+      boardEl.appendChild(sq);
+    }
+  }
+}
+
+function renderBoard() {
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const sq = getSquareEl(r,c);
+      if (!sq) continue;
+      sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
+      if (lastFrom && lastFrom[0]===r && lastFrom[1]===c) sq.classList.add('last-move');
+      if (lastTo   && lastTo[0]===r   && lastTo[1]===c)   sq.classList.add('last-move');
+      sq.innerHTML = '';
+      const p = board[r][c];
+      if (p) {
+        const span = document.createElement('span');
+        span.className = 'piece';
+        span.textContent = PIECES[p] || '';
+        sq.appendChild(span);
+      }
+    }
+  }
+  // Highlight selected & valid moves
+  if (selected) {
+    getSquareEl(...selected)?.classList.add('selected');
+    validMoves.forEach(([mr,mc]) => {
+      const el = getSquareEl(mr,mc);
+      if (!el) return;
+      el.classList.add(board[mr][mc] ? 'valid-capture' : 'valid-move');
+    });
+  }
+  // Check highlight
+  const kingPos = findKing(turn[0]);
+  if (kingPos && isInCheck(board, turn[0])) {
+    getSquareEl(...kingPos)?.classList.add('in-check');
+  }
+}
+
+function getSquareEl(r,c) {
+  return document.querySelector(`#board .sq[data-r="${r}"][data-c="${c}"]`);
+}
+
+// ─── Chess logic ─────────────────────────────────────────────
+function onSquareClick(r, c) {
+  if (!gameActive) return;
+  if (myColor !== turn) return; // not your turn
+
+  const clicked = board[r][c];
+
+  if (selected) {
+    const move = validMoves.find(([mr,mc]) => mr===r && mc===c);
+    if (move) {
+      doMove(selected[0], selected[1], r, c);
+      selected = null; validMoves = [];
+      renderBoard();
+      return;
+    }
+  }
+
+  if (clicked && pieceColor(clicked) === myColor[0]) {
+    selected = [r,c];
+    validMoves = getLegalMoves(board, r, c, myColor[0]);
+  } else {
+    selected = null; validMoves = [];
+  }
+  renderBoard();
+}
+
+function doMove(fr, fc, tr, tc, promoChoice) {
+  const piece = board[fr][fc];
+  const target = board[tr][tc];
+  const newBoard = board.map(row => [...row]);
+
+  // En passant
+  let enPassantCapture = null;
+  if (pieceType(piece)==='P' && fc!==tc && !target) {
+    newBoard[fr][tc] = null;
+    enPassantCapture = newBoard[fr][tc];
+  }
+
+  if (target) {
+    if (pieceColor(piece)==='w') capturedByWhite.push(target);
+    else capturedByBlack.push(target);
+  }
+
+  // Castling
+  if (pieceType(piece)==='K' && Math.abs(fc-tc)===2) {
+    if (tc===6) { newBoard[fr][7]=null; newBoard[fr][5]= pieceColor(piece)+'R'; }
+    else        { newBoard[fr][0]=null; newBoard[fr][3]= pieceColor(piece)+'R'; }
+  }
+
+  newBoard[tr][tc] = piece;
+  newBoard[fr][fc] = null;
+
+  // Promotion
+  if (pieceType(piece)==='P' && (tr===0 || tr===7)) {
+    if (!promoChoice) {
+      // Pause and ask
+      pendingPromotion = {fr, fc, tr, tc, piece};
+      board = newBoard; // preview
+      renderBoard();
+      showPromoModal(pieceColor(piece));
+      return;
+    }
+    newBoard[tr][tc] = pieceColor(piece) + promoChoice;
+  }
+
+  board = newBoard;
+  lastFrom = [fr,fc]; lastTo = [tr,tc];
+
+  const nextTurn = turn === 'white' ? 'black' : 'white';
+  const notation = toAlgebraic(piece, fr, fc, tr, tc, target, promoChoice);
+  moveLog.push(notation);
+
+  // Push to Firebase
+  update(gameRef, {
+    board: JSON.stringify(board),
+    turn: nextTurn,
+    capturedByWhite: JSON.stringify(capturedByWhite),
+    capturedByBlack: JSON.stringify(capturedByBlack),
+    moveLog: JSON.stringify(moveLog),
+    lastFrom: JSON.stringify([fr,fc]),
+    lastTo:   JSON.stringify([tr,tc]),
+  });
+}
+
+function showPromoModal(color) {
+  const modal = document.getElementById('promo-modal');
+  const choices = document.getElementById('promo-choices');
+  choices.innerHTML = '';
+  modal.classList.remove('hidden');
+  ['Q','R','B','N'].forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'promo-btn';
+    btn.textContent = PIECES[color+t];
+    btn.onclick = () => {
+      modal.classList.add('hidden');
+      const {fr,fc,tr,tc,piece} = pendingPromotion;
+      pendingPromotion = null;
+      doMove(fr, fc, tr, tc, t);
+    };
+    choices.appendChild(btn);
+  });
+}
+
+function toAlgebraic(piece, fr, fc, tr, tc, cap, promo) {
+  const files = 'abcdefgh';
+  const type = pieceType(piece);
+  let s = type === 'P' ? '' : type;
+  if (type==='P' && cap) s += files[fc] + 'x';
+  else if (cap) s += 'x';
+  s += files[tc] + (8-tr);
+  if (promo) s += '=' + promo;
+  return s;
+}
+
+// ─── Move generation (simplified but functional) ─────────────
+function getLegalMoves(b, r, c, color) {
+  const raw = getRawMoves(b, r, c, color);
+  return raw.filter(([tr,tc]) => {
+    const next = b.map(row=>[...row]);
+    next[tr][tc] = next[r][c];
+    next[r][c] = null;
+    return !isInCheck(next, color);
+  });
+}
+
+function getRawMoves(b, r, c, color) {
+  const p = b[r][c]; if (!p) return [];
+  const type = pieceType(p);
+  const moves = [];
+  const inBounds = (r,c) => r>=0&&r<8&&c>=0&&c<8;
+  const slide = (dirs) => {
+    dirs.forEach(([dr,dc]) => {
+      let nr=r+dr, nc=c+dc;
+      while(inBounds(nr,nc)) {
+        if (!b[nr][nc]) { moves.push([nr,nc]); }
+        else { if(pieceColor(b[nr][nc])!==color) moves.push([nr,nc]); break; }
+        nr+=dr; nc+=dc;
+      }
+    });
+  };
+  const jump = (dirs) => {
+    dirs.forEach(([dr,dc]) => {
+      const nr=r+dr, nc=c+dc;
+      if(inBounds(nr,nc) && pieceColor(b[nr][nc])!==color) moves.push([nr,nc]);
+    });
+  };
+
+  if (type==='R') slide([[1,0],[-1,0],[0,1],[0,-1]]);
+  if (type==='B') slide([[1,1],[1,-1],[-1,1],[-1,-1]]);
+  if (type==='Q') slide([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
+  if (type==='N') jump([[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]);
+  if (type==='K') {
+    jump([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
+    // Castling (simplified: no check-through-check validation here)
+    if (!isInCheck(b, color)) {
+      if (color==='w' && r===7) {
+        if (!b[7][5]&&!b[7][6]&&b[7][7]==='wR') moves.push([7,6]);
+        if (!b[7][1]&&!b[7][2]&&!b[7][3]&&b[7][0]==='wR') moves.push([7,2]);
+      }
+      if (color==='b' && r===0) {
+        if (!b[0][5]&&!b[0][6]&&b[0][7]==='bR') moves.push([0,6]);
+        if (!b[0][1]&&!b[0][2]&&!b[0][3]&&b[0][0]==='bR') moves.push([0,2]);
+      }
+    }
+  }
+  if (type==='P') {
+    const dir = color==='w' ? -1 : 1;
+    const start = color==='w' ? 6 : 1;
+    if (inBounds(r+dir,c) && !b[r+dir][c]) {
+      moves.push([r+dir,c]);
+      if (r===start && !b[r+2*dir][c]) moves.push([r+2*dir,c]);
+    }
+    [[r+dir,c-1],[r+dir,c+1]].forEach(([nr,nc]) => {
+      if(inBounds(nr,nc) && b[nr][nc] && pieceColor(b[nr][nc])!==color) moves.push([nr,nc]);
+    });
+  }
+  return moves;
+}
+
+function isInCheck(b, color) {
+  const king = findKingIn(b, color);
+  if (!king) return false;
+  const ocolor = opp(color);
+  for (let r=0;r<8;r++) for(let c=0;c<8;c++) {
+    if(pieceColor(b[r][c])===ocolor) {
+      if(getRawMoves(b,r,c,ocolor).some(([tr,tc])=>tr===king[0]&&tc===king[1])) return true;
+    }
+  }
+  return false;
+}
+
+function findKingIn(b, color) {
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(b[r][c]===color+'K') return [r,c];
+  return null;
+}
+function findKing(color) { return findKingIn(board, color); }
+
+function hasLegalMoves(color) {
+  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
+    if(pieceColor(board[r][c])===color[0])
+      if(getLegalMoves(board,r,c,color[0]).length>0) return true;
+  return false;
+}
+
+function checkGameEnd() {
+  const c = turn[0];
+  const legalMovesExist = hasLegalMoves(turn);
+  const inCheck = isInCheck(board, c);
+  if (!legalMovesExist) {
+    if (inCheck) endGame(turn==='white' ? 'BLACK WINS' : 'WHITE WINS', 'Checkmate!');
+    else         endGame('DRAW', 'Stalemate — no legal moves.');
+  }
+}
+
+function endGame(title, msg) {
+  gameActive = false;
+  document.getElementById('gameover-title').textContent = title;
+  document.getElementById('gameover-msg').textContent   = msg;
+  document.getElementById('gameover-screen').classList.remove('hidden');
+  update(gameRef, { status: 'complete' });
+}
+
+// ─── UI helpers ──────────────────────────────────────────────
+function updateStatus(msg) {
+  const bar = document.getElementById('status-bar');
+  bar.textContent = msg;
+  bar.style.animation = 'none';
+  bar.offsetHeight; // reflow
+  bar.style.animation = 'statusPulse 1s ease-in-out';
+}
+
+function updateSidePanels() {
+  const wCard = document.getElementById('card-white');
+  const bCard = document.getElementById('card-black');
+  wCard.classList.toggle('active-turn', turn === 'white');
+  bCard.classList.toggle('active-turn', turn === 'black');
+
+  document.getElementById('captured-by-white').textContent =
+    capturedByBlack.map(p => PIECES[p]||'').join('');
+  document.getElementById('captured-by-black').textContent =
+    capturedByWhite.map(p => PIECES[p]||'').join('');
+
+  const log = document.getElementById('move-log-list');
+  log.innerHTML = '';
+  moveLog.forEach((m, i) => {
+    const d = document.createElement('div');
+    d.style.color = i%2===0 ? 'var(--green)' : 'var(--green-dim)';
+    const num = Math.floor(i/2)+1;
+    d.textContent = (i%2===0 ? num + '. ' : '    ') + m;
+    log.appendChild(d);
+  });
+  log.scrollTop = log.scrollHeight;
+}
+
+// ─── Room / Firebase ─────────────────────────────────────────
+function genRoomId() {
+  return Math.random().toString(36).slice(2,8).toUpperCase();
+}
+
+window.createRoom = async function() {
+  showConnecting();
+  await ensureAuth();
+  const id = genRoomId();
+  roomId = id;
+  gameRef = ref(db, `games/${id}`);
+  const initialBoard = initBoard();
+  await set(gameRef, {
+    board: JSON.stringify(initialBoard),
+    turn: 'white',
+    status: 'waiting',
+    capturedByWhite: '[]',
+    capturedByBlack: '[]',
+    moveLog: '[]',
+    lastFrom: 'null',
+    lastTo:   'null',
+    players: { white: uid }
+  });
+  myColor = 'white';
+  setupDisconnect();
+  document.getElementById('join-screen').classList.add('hidden');
+  document.getElementById('your-color-display').textContent = '⬜ WHITE';
+  document.getElementById('room-code-display').textContent  = id;
+  document.getElementById('wait-screen').classList.remove('hidden');
+  startWaitDots();
+  listenToGame();
+};
+
+window.joinRoom = async function() {
+  const input = document.getElementById('room-input').value.trim().toUpperCase();
+  if (!input) return;
+  showConnecting();
+  await ensureAuth();
+  const snap = await get(ref(db, `games/${input}`));
+  if (!snap.exists()) { alert('Room not found.'); hideConnecting(); return; }
+  const data = snap.val();
+  if (data.status !== 'waiting' || data.players?.black) { alert('Room is full or game in progress.'); hideConnecting(); return; }
+  roomId = input;
+  gameRef = ref(db, `games/${input}`);
+  await update(gameRef, { 'players/black': uid, status: 'active' });
+  myColor = 'black';
+  setupDisconnect();
+  document.getElementById('join-screen').classList.add('hidden');
+  listenToGame();
+};
+
+function setupDisconnect() {
+  const connRef = ref(db, `games/${roomId}/players/${myColor}`);
+  onDisconnect(connRef).set(null);
+}
+
+function listenToGame() {
+  buildBoardUI();
+  onValue(gameRef, snap => {
+    if (!snap.exists()) return;
+    const d = snap.val();
+
+    board          = JSON.parse(d.board);
+    turn           = d.turn;
+    capturedByWhite= JSON.parse(d.capturedByWhite || '[]');
+    capturedByBlack= JSON.parse(d.capturedByBlack || '[]');
+    moveLog        = JSON.parse(d.moveLog || '[]');
+    lastFrom       = JSON.parse(d.lastFrom || 'null');
+    lastTo         = JSON.parse(d.lastTo   || 'null');
+    selected       = null;
+    validMoves     = [];
+
+    // Player status labels
+    document.getElementById('status-white').textContent =
+      d.players?.white ? '● online' : '○ offline';
+    document.getElementById('status-black').textContent =
+      d.players?.black ? '● online' : '○ offline';
+
+    if (d.status === 'waiting') {
+      // Still waiting for opponent (creator sees wait screen)
+      return;
+    }
+
+    // Game is active
+    if (!gameActive) {
+      document.getElementById('wait-screen').classList.add('hidden');
+      stopWaitDots();
+      gameActive = true;
+    }
+
+    renderBoard();
+    updateSidePanels();
+
+    if (d.status === 'complete') return;
+
+    checkGameEnd();
+
+    // Status bar
+    const myTurn = turn === myColor;
+    const inCheck = isInCheck(board, turn[0]);
+    if (inCheck) {
+      updateStatus(`⚠ ${turn.toUpperCase()} IS IN CHECK ${myTurn ? '— YOUR MOVE' : ''}`);
+    } else {
+      updateStatus(myTurn ? `▶ YOUR TURN · ${myColor.toUpperCase()}` : `⏳ OPPONENT'S TURN · ${turn.toUpperCase()}`);
+    }
+  });
+}
+
+function ensureAuth() {
+  return new Promise(resolve => {
+    if (uid) { resolve(); return; }
+    signInAnonymously(auth).then(() => {
+      onAuthStateChanged(auth, user => { if (user) { uid = user.uid; resolve(); } });
+    });
+  });
+}
+
+function showConnecting() {
+  document.getElementById('join-options').style.display    = 'none';
+  document.getElementById('connecting-msg').style.display  = 'block';
+}
+function hideConnecting() {
+  document.getElementById('join-options').style.display    = '';
+  document.getElementById('connecting-msg').style.display  = 'none';
+}
+
+function startWaitDots() {
+  let n = 0;
+  const el = document.getElementById('wait-dots');
+  waitDotsInterval = setInterval(() => {
+    el.textContent = '.'.repeat((++n % 4));
+  }, 500);
+}
+function stopWaitDots() {
+  clearInterval(waitDotsInterval);
+  const el = document.getElementById('wait-dots');
+  if (el) el.textContent = '';
+}
+
+window.copyRoomCode = function() {
+  navigator.clipboard.writeText(roomId);
+  const el = document.getElementById('share-room-code');
+  const orig = el.textContent;
+  el.textContent = '✓ Copied!';
+  setTimeout(() => el.textContent = orig, 1500);
+};
+
+window.resetToLobby = function() {
+  gameActive = false; myColor = null; roomId = null; gameRef = null;
+  board = []; selected = null; validMoves = []; turn = 'white';
+  capturedByWhite = []; capturedByBlack = []; moveLog = [];
+  lastFrom = null; lastTo = null;
+  document.getElementById('gameover-screen').classList.add('hidden');
+  document.getElementById('join-screen').classList.remove('hidden');
+  hideConnecting();
+  document.getElementById('room-input').value = '';
+};
+
+// ─── Init ────────────────────────────────────────────────────
+buildBoardUI();
+updateStatus('ENTER ROOM CODE OR CREATE NEW GAME');
+
+</script>
+</body>
+</html>
