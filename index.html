@@ -529,12 +529,13 @@ import { getDatabase, ref, set, get, update, onValue, onDisconnect, serverTimest
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -1011,6 +1012,24 @@ function listenToGame() {
     if (!snap.exists()) return;
     const d = snap.val();
 
+    // Always update player status indicators
+    document.getElementById('status-white').textContent =
+      d.players?.white ? 'online' : 'offline';
+    document.getElementById('status-black').textContent =
+      d.players?.black ? 'online' : 'offline';
+
+    if (d.status === 'waiting') {
+      updateStatus('WAITING FOR OPPONENT...');
+      return;
+    }
+
+    // Game is active or complete - enable everything
+    document.getElementById('wait-screen').classList.add('hidden');
+    document.getElementById('join-screen').classList.add('hidden');
+    stopWaitDots();
+    gameActive = true;
+
+    // Sync all state from Firebase
     board          = JSON.parse(d.board);
     turn           = d.turn;
     capturedByWhite= JSON.parse(d.capturedByWhite || '[]');
@@ -1020,24 +1039,6 @@ function listenToGame() {
     lastTo         = JSON.parse(d.lastTo   || 'null');
     selected       = null;
     validMoves     = [];
-
-    // Player status labels
-    document.getElementById('status-white').textContent =
-      d.players?.white ? '● online' : '○ offline';
-    document.getElementById('status-black').textContent =
-      d.players?.black ? '● online' : '○ offline';
-
-    if (d.status === 'waiting') {
-      // Still waiting for opponent (creator sees wait screen)
-      return;
-    }
-
-    // Game is active
-    if (!gameActive) {
-      document.getElementById('wait-screen').classList.add('hidden');
-      stopWaitDots();
-      gameActive = true;
-    }
 
     renderBoard();
     updateSidePanels();
@@ -1050,9 +1051,9 @@ function listenToGame() {
     const myTurn = turn === myColor;
     const inCheck = isInCheck(board, turn[0]);
     if (inCheck) {
-      updateStatus(`⚠ ${turn.toUpperCase()} IS IN CHECK ${myTurn ? '— YOUR MOVE' : ''}`);
+      updateStatus('CHECK! ' + turn.toUpperCase() + (myTurn ? ' - YOUR MOVE' : ''));
     } else {
-      updateStatus(myTurn ? `▶ YOUR TURN · ${myColor.toUpperCase()}` : `⏳ OPPONENT'S TURN · ${turn.toUpperCase()}`);
+      updateStatus(myTurn ? 'YOUR TURN - ' + myColor.toUpperCase() : "OPPONENT'S TURN - " + turn.toUpperCase());
     }
   });
 }
