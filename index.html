@@ -487,7 +487,7 @@
         <div class="section-label">PLAYER_02</div>
         <div class="player-card" id="card-black">
           <span class="color-dot black"></span>
-          <span class="name">BLACK</span>
+          <span class="name" id="name-black">BLACK</span>
           <div class="status" id="status-black">waiting...</div>
         </div>
       </div>
@@ -512,7 +512,7 @@
         <div class="section-label">PLAYER_01</div>
         <div class="player-card" id="card-white">
           <span class="color-dot white"></span>
-          <span class="name">WHITE</span>
+          <span class="name" id="name-white">WHITE</span>
           <div class="status" id="status-white">waiting...</div>
         </div>
       </div>
@@ -542,13 +542,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -558,6 +558,7 @@ const db   = getDatabase(app);
 
 // ─── State ────────────────────────────────────────────────────
 let uid = null, myColor = null, roomId = null, gameRef = null;
+let flipped = false;
 let board = [], selected = null, validMoves = [], turn = 'white';
 let capturedByWhite = [], capturedByBlack = [], moveLog = [];
 let gameActive = false, lastFrom = null, lastTo = null;
@@ -618,16 +619,7 @@ window.addEventListener('resize', () => {
 function buildBoardUI() {
   const boardEl = document.getElementById('board');
   boardEl.innerHTML = '';
-  const cols = document.getElementById('coord-cols');
-  const rows = document.getElementById('coord-rows');
-  cols.innerHTML = '';
-  rows.innerHTML = '';
-
-  const files = ['a','b','c','d','e','f','g','h'];
-  const ranks = ['8','7','6','5','4','3','2','1'];
-  files.forEach(f => { const s=document.createElement('span');s.textContent=f;cols.appendChild(s); });
-  ranks.forEach(r => { const s=document.createElement('span');s.textContent=r;rows.appendChild(s); });
-
+  updateCoords();
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const sq = document.createElement('div');
@@ -637,6 +629,29 @@ function buildBoardUI() {
       boardEl.appendChild(sq);
     }
   }
+}
+
+function updateCoords() {
+  const cols = document.getElementById('coord-cols');
+  const rows = document.getElementById('coord-rows');
+  cols.innerHTML = '';
+  rows.innerHTML = '';
+  // Flip coordinate labels for black player
+  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+  const ranks = flipped ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
+  files.forEach(f => { const s=document.createElement('span');s.textContent=f;cols.appendChild(s); });
+  ranks.forEach(r => { const s=document.createElement('span');s.textContent=r;rows.appendChild(s); });
+}
+
+function applyBoardFlip() {
+  const boardEl = document.getElementById('board');
+  // Flip the whole board visually for black player
+  boardEl.style.transform = flipped ? 'rotate(180deg)' : '';
+  // Counter-rotate each piece so they stay upright
+  document.querySelectorAll('#board .piece').forEach(p => {
+    p.style.transform = flipped ? 'rotate(180deg)' : '';
+  });
+  updateCoords();
 }
 
 function renderBoard() {
@@ -671,6 +686,8 @@ function renderBoard() {
   if (kingPos && isInCheck(board, turn[0])) {
     getSquareEl(...kingPos)?.classList.add('in-check');
   }
+  // Apply board flip for black player (pieces need counter-rotation)
+  applyBoardFlip();
 }
 
 function getSquareEl(r,c) {
@@ -952,6 +969,9 @@ function updateSidePanels() {
   const bCard = document.getElementById('card-black');
   wCard.classList.toggle('active-turn', turn === 'white');
   bCard.classList.toggle('active-turn', turn === 'black');
+  // Show YOU tag on the correct card
+  document.getElementById('name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
+  document.getElementById('name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
 
   document.getElementById('captured-by-white').textContent =
     capturedByBlack.map(p => PIECES[p]||'').join('');
@@ -1048,6 +1068,7 @@ function listenToGame() {
     document.getElementById('join-screen').classList.add('hidden');
     stopWaitDots();
     gameActive = true;
+    flipped = (myColor === 'black');
 
     // Parse state from Firebase
     board           = JSON.parse(d.board);
@@ -1119,7 +1140,7 @@ window.copyRoomCode = function() {
 window.resetToLobby = function() {
   // Detach Firebase listener if active
   if (gameRef) { off(gameRef); }
-  gameActive = false; myColor = null; roomId = null; gameRef = null;
+  gameActive = false; myColor = null; roomId = null; gameRef = null; flipped = false;
   board = []; selected = null; validMoves = []; turn = 'white';
   capturedByWhite = []; capturedByBlack = []; moveLog = [];
   lastFrom = null; lastTo = null;
