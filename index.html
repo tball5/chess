@@ -812,13 +812,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -921,6 +921,85 @@ const PIECE_SVG = {
       <rect x="10" y="28" width="25" height="3.5" rx="1.5"/>
       <rect x="8"  y="31.5" width="29" height="4" rx="2"/>
     </g></svg>`,
+};
+
+function getPieceSVG(p) {
+  if (!p) return '';
+  const type  = p[1];
+  const color = p[0];
+  const fill   = color === 'w' ? '#ffffff' : '#1a1a1a';
+  const stroke = color === 'w' ? 'rgba(0,0,0,0.35)' : '#888888';
+  return PIECE_SVG[type]
+    .replace(/FILL/g, fill)
+    .replace(/STROKE/g, stroke);
+}
+
+function buildBoardUI() {
+  const boardEl = document.getElementById('board');
+  boardEl.innerHTML = '';
+  updateCoords();
+  for (let r = 0; r < 8; r++) {
+    for (let c = 0; c < 8; c++) {
+      const sq = document.createElement('div');
+      sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
+      sq.dataset.r = r; sq.dataset.c = c;
+      sq.addEventListener('click', () => onSquareClick(r, c));
+      sq.addEventListener('touchend', (e) => { e.preventDefault(); onSquareClick(r, c); });
+      boardEl.appendChild(sq);
+    }
+  }
+}
+
+function updateCoords() {
+  const cols = document.getElementById('coord-cols');
+  const rows = document.getElementById('coord-rows');
+  if (!cols || !rows) return;
+  cols.innerHTML = '';
+  rows.innerHTML = '';
+  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
+  const ranks = flipped ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
+  files.forEach(f => { const s=document.createElement('span');s.textContent=f;cols.appendChild(s); });
+  ranks.forEach(r => { const s=document.createElement('span');s.textContent=r;rows.appendChild(s); });
+}
+
+function applyBoardFlip() {
+  const boardEl = document.getElementById('board');
+  boardEl.style.transform = flipped ? 'rotate(180deg)' : '';
+  document.querySelectorAll('#board .piece').forEach(p => {
+    p.style.transform = flipped ? 'rotate(180deg)' : '';
+  });
+  updateCoords();
+}
+
+function drawMoveArrow() {
+  const overlay = document.getElementById('arrow-overlay');
+  if (!overlay) return;
+  overlay.innerHTML = '';
+  if (!lastFrom || !lastTo) return;
+
+  const boardEl = document.getElementById('board');
+  const sqSize = boardEl.offsetWidth / 8;
+
+  function toVisual(r, c) {
+    const vr = flipped ? 7 - r : r;
+    const vc = flipped ? 7 - c : c;
+    return { x: vc * sqSize + sqSize / 2, y: vr * sqSize + sqSize / 2 };
+  }
+
+  const from = toVisual(lastFrom[0], lastFrom[1]);
+  const to   = toVisual(lastTo[0],   lastTo[1]);
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 1) return;
+  const ux = dx/len, uy = dy/len;
+  const arrowHeadLen = sqSize * 0.38;
+  const shaftEnd = { x: to.x - ux * arrowHeadLen * 0.6, y: to.y - uy * arrowHeadLen * 0.6 };
+  const px = -uy, py = ux;
+  const hw = arrowHeadLen * 0.38;
+
+  const arrowPath = [
+    `M ${from.x + px*hw*0.5} ${from.y + py*hw*0.5}`,
     `L ${shaftEnd.x + px*hw*0.5} ${shaftEnd.y + py*hw*0.5}`,
     `L ${shaftEnd.x + px*hw} ${shaftEnd.y + py*hw}`,
     `L ${to.x} ${to.y}`,
@@ -938,6 +1017,7 @@ const PIECE_SVG = {
   path.setAttribute('stroke-linejoin', 'round');
   overlay.appendChild(path);
 }
+
 
 function renderBoard() {
   for (let r = 0; r < 8; r++) {
