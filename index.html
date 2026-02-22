@@ -811,13 +811,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -1430,6 +1430,19 @@ function genRoomId() {
 window.createRoom = async function() {
   showConnecting();
   await ensureAuth();
+  // Silently clean up completed/abandoned games on room creation
+  try {
+    const snap = await get(ref(db, 'games'));
+    if (snap.exists()) {
+      const data = snap.val();
+      for (const [k, g] of Object.entries(data)) {
+        if (g.status === 'complete' || !g.players?.black) {
+          set(ref(db, 'games/' + k), null);
+          set(ref(db, 'chat/' + k), null);
+        }
+      }
+    }
+  } catch(e) { /* silent */ }
   const id = genRoomId();
   roomId = id;
   myColor = 'white';
@@ -1483,13 +1496,9 @@ function listenToGame() {
   onValue(gameRef, snap => {
     try {
       if (!snap.exists()) return;
-      // If game already ended locally, ignore further Firebase updates
-      // (prevents double-processing when endGame writes status:complete)
-      if (gameEnded) return;
-
       const d = snap.val();
 
-      // Always update online indicators
+      // Update online indicators
       document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
       document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
 
@@ -1516,10 +1525,9 @@ function listenToGame() {
       validMoves      = [];
       flipped         = (myColor === 'black');
 
-      // Game already complete in Firebase (other player triggered endGame)
+      // Game already complete — show final board and banner
       if (d.status === 'complete') {
         gameActive = false;
-        gameEnded  = true;
         renderBoard();
         updateSidePanels();
         const banner = document.getElementById('gameover-banner');
@@ -1536,7 +1544,7 @@ function listenToGame() {
         return;
       }
 
-      // ── Live game ──
+      // Live game
       gameActive = true;
       renderBoard();
       updateSidePanels();
@@ -1544,12 +1552,10 @@ function listenToGame() {
       const myTurn  = (turn === myColor);
       const inCheck = isInCheck(board, turn[0]);
 
-      // Only check for game-ending conditions when it's YOUR turn
-      // (you are the one who needs to move — check if you have any moves)
+      // Only check for game-over conditions on the player whose turn it is
       if (myTurn) {
         const hasLegal = hasLegalMoves(turn);
         if (!hasLegal) {
-          gameEnded = true;
           if (inCheck) {
             endGame('YOU LOSE', 'Checkmate! ' + (turn === 'white' ? 'BLACK' : 'WHITE') + ' wins.');
           } else {
@@ -1559,7 +1565,7 @@ function listenToGame() {
         }
       }
 
-      // Update status bar
+      // Always update status bar — this must always run
       if (inCheck) {
         updateStatus(myTurn ? 'CHECK! YOUR KING IS IN CHECK' : 'CHECK! ' + turn.toUpperCase() + ' IS IN CHECK');
       } else {
@@ -1568,6 +1574,11 @@ function listenToGame() {
 
     } catch(e) {
       console.error('[listenToGame error]', e);
+      // Even on error, try to update the status bar
+      try {
+        const myTurn = (turn === myColor);
+        updateStatus(myTurn ? 'YOUR TURN' : "OPPONENT'S TURN");
+      } catch(_) {}
     }
   });
 }
@@ -1683,6 +1694,25 @@ function cleanupChat() {
   document.getElementById('chat-wrap').classList.remove('active');
   document.getElementById('chat-messages').innerHTML = '';
 }
+
+// ─── Cleanup old games ───────────────────────────────────────
+window.purgeOldGames = async function() {
+  const allGames = ref(db, 'games');
+  const snap = await get(allGames);
+  if (!snap.exists()) { alert('No games found.'); return; }
+  const data = snap.val();
+  const keys = Object.keys(data);
+  let deleted = 0;
+  for (const k of keys) {
+    const g = data[k];
+    // Delete completed games or games with no black player (abandoned)
+    if (g.status === 'complete' || !g.players?.black) {
+      await set(ref(db, 'games/' + k), null);
+      deleted++;
+    }
+  }
+  alert('Deleted ' + deleted + ' old game(s). ' + (keys.length - deleted) + ' active game(s) remain.');
+};
 
 // ─── Init ────────────────────────────────────────────────────
 buildBoardUI();
