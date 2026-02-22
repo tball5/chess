@@ -812,13 +812,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -1374,7 +1374,304 @@ function writeGameOver() {
       if (roomId) set(ref(db, 'chat/' + roomId), null);
     }, 30000);
   }
+
 }
+
+// ─── UI helpers ──────────────────────────────────────────────
+function updateStatus(msg) {
+  const bar = document.getElementById('status-bar');
+  bar.textContent = msg;
+  bar.style.animation = 'none';
+  bar.offsetHeight;
+  bar.style.animation = 'statusPulse 1s ease-in-out';
+}
+
+function updateSidePanels() {
+  const wCard = document.getElementById('card-white');
+  const bCard = document.getElementById('card-black');
+  wCard.classList.toggle('active-turn', turn === 'white');
+  bCard.classList.toggle('active-turn', turn === 'black');
+  document.getElementById('name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
+  document.getElementById('name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
+  const mw = document.getElementById('mobile-white');
+  const mb = document.getElementById('mobile-black');
+  if (mw) {
+    mw.className = 'mobile-player ' + (turn === 'white' ? 'active' : 'inactive');
+    document.getElementById('mobile-name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
+    document.getElementById('mobile-status-white').textContent = turn === 'white' ? 'YOUR TURN' : '';
+  }
+  if (mb) {
+    mb.className = 'mobile-player ' + (turn === 'black' ? 'active' : 'inactive');
+    document.getElementById('mobile-name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
+    document.getElementById('mobile-status-black').textContent = turn === 'black' ? 'YOUR TURN' : '';
+  }
+  const log = document.getElementById('move-log-list');
+  if (log) {
+    log.innerHTML = '';
+    moveLog.forEach((m, i) => {
+      const d = document.createElement('div');
+      d.style.color = i%2===0 ? 'var(--green)' : 'var(--green-dim)';
+      const num = Math.floor(i/2)+1;
+      d.textContent = (i%2===0 ? num + '. ' : '    ') + m;
+      log.appendChild(d);
+    });
+    log.scrollTop = log.scrollHeight;
+  }
+}
+
+// ─── Room / Firebase ─────────────────────────────────────────
+function genRoomId() {
+  return Math.floor(100 + Math.random() * 900).toString();
+}
+
+window.createRoom = async function() {
+  showConnecting();
+  await ensureAuth();
+  // Silently clean up completed/abandoned games
+  try {
+    const snap = await get(ref(db, 'games'));
+    if (snap.exists()) {
+      const data = snap.val();
+      for (const [k, g] of Object.entries(data)) {
+        if (g.status === 'complete' || !g.players?.black) {
+          set(ref(db, 'games/' + k), null);
+          set(ref(db, 'chat/' + k), null);
+        }
+      }
+    }
+  } catch(e) { /* silent */ }
+  const id = genRoomId();
+  roomId = id;
+  myColor = 'white';
+  gameRef = ref(db, `games/${id}`);
+  const initialBoard = initBoard();
+  await set(gameRef, {
+    board: JSON.stringify(initialBoard),
+    turn: 'white',
+    status: 'waiting',
+    capturedByWhite: '[]',
+    capturedByBlack: '[]',
+    moveLog: '[]',
+    lastFrom: 'null',
+    lastTo:   'null',
+    players: { white: uid }
+  });
+  setupDisconnect();
+  document.getElementById('join-screen').classList.add('hidden');
+  document.getElementById('your-color-display').textContent = 'WHITE';
+  document.getElementById('room-code-display').textContent  = id;
+  document.getElementById('wait-screen').classList.remove('hidden');
+  startWaitDots();
+  listenToGame();
+};
+
+window.joinRoom = async function() {
+  const input = document.getElementById('room-input').value.trim();
+  if (!input) return;
+  showConnecting();
+  await ensureAuth();
+  const snap = await get(ref(db, `games/${input}`));
+  if (!snap.exists()) { alert('Room not found. Check the code and try again.'); hideConnecting(); return; }
+  const data = snap.val();
+  if (data.status !== 'waiting' || data.players?.black) { alert('Room is full or already in progress.'); hideConnecting(); return; }
+  roomId = input;
+  myColor = 'black';
+  gameRef = ref(db, `games/${input}`);
+  await update(gameRef, { 'players/black': uid, status: 'active' });
+  setupDisconnect();
+  document.getElementById('join-screen').classList.add('hidden');
+  listenToGame();
+};
+
+function setupDisconnect() {
+  const connRef = ref(db, `games/${roomId}/players/${myColor}`);
+  onDisconnect(connRef).set(null);
+}
+
+function listenToGame() {
+  onValue(gameRef, snap => {
+    try {
+      if (!snap.exists()) return;
+      const d = snap.val();
+
+      document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
+      document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
+
+      if (d.status === 'waiting') {
+        updateStatus('WAITING FOR OPPONENT...');
+        return;
+      }
+
+      document.getElementById('wait-screen').classList.add('hidden');
+      document.getElementById('join-screen').classList.add('hidden');
+      stopWaitDots();
+      if (!chatRef) initChat();
+
+      board           = JSON.parse(d.board);
+      turn            = d.turn;
+      capturedByWhite = JSON.parse(d.capturedByWhite || '[]');
+      capturedByBlack = JSON.parse(d.capturedByBlack || '[]');
+      moveLog         = JSON.parse(d.moveLog || '[]');
+      lastFrom        = JSON.parse(d.lastFrom || 'null');
+      lastTo          = JSON.parse(d.lastTo   || 'null');
+      selected        = null;
+      validMoves      = [];
+      flipped         = (myColor === 'black');
+
+      renderBoard();
+      updateSidePanels();
+
+      // ── Game already over (written by losing player) ──
+      if (d.status === 'complete') {
+        gameActive = false;
+        if (!gameEnded) {
+          gameEnded = true;
+          const inChk = isInCheck(board, turn[0]);
+          if (inChk) {
+            // turn = the checkmated player
+            const iLost = (turn === myColor);
+            endGame(
+              iLost ? 'YOU LOSE' : 'YOU WIN!',
+              'Checkmate! ' + (turn === 'white' ? 'BLACK' : 'WHITE') + ' wins.'
+            );
+          } else {
+            endGame('DRAW', 'Stalemate — no legal moves.');
+          }
+        }
+        return;
+      }
+
+      // ── Live game ──
+      gameActive = true;
+      const myTurn  = (turn === myColor);
+      const inCheck = isInCheck(board, turn[0]);
+
+      if (myTurn) {
+        const hasLegal = hasLegalMoves(turn);
+        if (!hasLegal) {
+          if (inCheck) {
+            endGame('YOU LOSE', 'Checkmate! ' + (myColor === 'white' ? 'BLACK' : 'WHITE') + ' wins.');
+          } else {
+            endGame('DRAW', 'Stalemate — no legal moves.');
+          }
+          writeGameOver();
+          return;
+        }
+      }
+
+      if (inCheck) {
+        updateStatus(myTurn ? 'CHECK! YOUR KING IS IN CHECK' : 'CHECK! ' + turn.toUpperCase() + ' IS IN CHECK');
+      } else {
+        updateStatus(myTurn ? 'YOUR TURN' : "OPPONENT'S TURN");
+      }
+
+    } catch(e) {
+      console.error('[listenToGame error]', e);
+    }
+  });
+}
+
+function ensureAuth() {
+  return new Promise(resolve => {
+    if (uid) { resolve(); return; }
+    signInAnonymously(auth).then(() => {
+      onAuthStateChanged(auth, user => { if (user) { uid = user.uid; resolve(); } });
+    });
+  });
+}
+
+function showConnecting() {
+  document.getElementById('join-options').style.display   = 'none';
+  document.getElementById('connecting-msg').style.display = 'block';
+}
+function hideConnecting() {
+  document.getElementById('join-options').style.display   = '';
+  document.getElementById('connecting-msg').style.display = 'none';
+}
+
+function startWaitDots() {
+  let n = 0;
+  const el = document.getElementById('wait-dots');
+  waitDotsInterval = setInterval(() => { el.textContent = '.'.repeat((++n % 4)); }, 500);
+}
+function stopWaitDots() {
+  clearInterval(waitDotsInterval);
+  const el = document.getElementById('wait-dots');
+  if (el) el.textContent = '';
+}
+
+window.copyRoomCode = function() {
+  navigator.clipboard.writeText(roomId);
+  const el = document.getElementById('share-room-code');
+  const orig = el.textContent;
+  el.textContent = '✓ Copied!';
+  setTimeout(() => el.textContent = orig, 1500);
+};
+
+window.resetToLobby = function() {
+  if (gameRef) { off(gameRef); }
+  gameActive = false; gameEnded = false; myColor = null; roomId = null; gameRef = null; flipped = false;
+  board = []; selected = null; validMoves = []; turn = 'white';
+  capturedByWhite = []; capturedByBlack = []; moveLog = [];
+  lastFrom = null; lastTo = null;
+  document.getElementById('gameover-screen').classList.add('hidden');
+  const banner = document.getElementById('gameover-banner');
+  if (banner) banner.style.display = 'none';
+  document.getElementById('join-screen').classList.remove('hidden');
+  hideConnecting();
+  document.getElementById('room-input').value = '';
+  cleanupChat();
+  buildBoardUI();
+  updateStatus('ENTER ROOM CODE OR CREATE NEW GAME');
+};
+
+// ─── Chat ────────────────────────────────────────────────────
+let chatRef = null;
+let chatListener = null;
+
+function initChat() {
+  if (!gameRef || !roomId) return;
+  if (chatRef) return; // already initialised
+  chatRef = ref(db, `chat/${roomId}`);
+  document.getElementById('chat-wrap').classList.add('active');
+  chatListener = onValue(chatRef, snap => {
+    const msgs = document.getElementById('chat-messages');
+    msgs.innerHTML = '';
+    if (!snap.exists()) return;
+    const data = snap.val();
+    Object.keys(data).sort().forEach(k => {
+      const m = data[k];
+      const div = document.createElement('div');
+      div.className = 'chat-msg ' + (m.uid === uid ? 'mine' : 'theirs');
+      div.innerHTML = `<span class="chat-who">${m.color.toUpperCase()} </span><span class="chat-text">${escapeHtml(m.text)}</span>`;
+      msgs.appendChild(div);
+    });
+    msgs.scrollTop = msgs.scrollHeight;
+  });
+  const input = document.getElementById('chat-input');
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+window.sendChat = function() {
+  const input = document.getElementById('chat-input');
+  const text = input.value.trim();
+  if (!text || !roomId) return;
+  input.value = '';
+  push(ref(db, `chat/${roomId}`), { uid, color: myColor, text, ts: serverTimestamp() });
+};
+
+function cleanupChat() {
+  if (chatListener && chatRef) off(chatRef, 'value', chatListener);
+  chatRef = null; chatListener = null;
+  document.getElementById('chat-wrap').classList.remove('active');
+  document.getElementById('chat-messages').innerHTML = '';
+}
+
+
 // ─── Cleanup old games ───────────────────────────────────────
 window.purgeOldGames = async function() {
   const allGames = ref(db, 'games');
