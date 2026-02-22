@@ -811,13 +811,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -828,6 +828,7 @@ const db   = getDatabase(app);
 // ─── State ────────────────────────────────────────────────────
 let uid = null, myColor = null, roomId = null, gameRef = null;
 let flipped = false;
+let gameEnded = false;
 let board = [], selected = null, validMoves = [], turn = 'white';
 let capturedByWhite = [], capturedByBlack = [], moveLog = [];
 let gameActive = false, lastFrom = null, lastTo = null;
@@ -1037,8 +1038,8 @@ function drawMoveArrow() {
 
   const path = document.createElementNS('http://www.w3.org/2000/svg','path');
   path.setAttribute('d', arrowPath);
-  path.setAttribute('fill', 'rgba(0,255,136,0.06)');
-  path.setAttribute('stroke', 'rgba(0,255,136,0.15)');
+  path.setAttribute('fill', 'rgba(0,255,136,0.03)');
+  path.setAttribute('stroke', 'rgba(0,255,136,0.08)');
   path.setAttribute('stroke-width', '1');
   path.setAttribute('stroke-linejoin', 'round');
   overlay.appendChild(path);
@@ -1358,6 +1359,7 @@ function checkGameEnd() {
 
 function endGame(title, msg) {
   gameActive = false;
+  gameEnded  = true;
   document.getElementById('gameover-title').textContent = title;
   document.getElementById('gameover-msg').textContent   = msg;
   const banner = document.getElementById('gameover-banner');
@@ -1479,89 +1481,93 @@ function setupDisconnect() {
 
 function listenToGame() {
   onValue(gameRef, snap => {
-    if (!snap.exists()) return;
-    const d = snap.val();
+    try {
+      if (!snap.exists()) return;
+      // If game already ended locally, ignore further Firebase updates
+      // (prevents double-processing when endGame writes status:complete)
+      if (gameEnded) return;
 
-    // Always update online indicators
-    document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
-    document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
+      const d = snap.val();
 
-    // Still waiting for second player — nothing else to do
-    if (d.status === 'waiting') {
-      updateStatus('WAITING FOR OPPONENT...');
-      return;
-    }
+      // Always update online indicators
+      document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
+      document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
 
-    // ── GAME IS ACTIVE OR COMPLETE ──
-    document.getElementById('wait-screen').classList.add('hidden');
-    document.getElementById('join-screen').classList.add('hidden');
-    stopWaitDots();
-    if (!chatRef) initChat();
+      if (d.status === 'waiting') {
+        updateStatus('WAITING FOR OPPONENT...');
+        return;
+      }
 
-    // Sync board state from Firebase
-    board           = JSON.parse(d.board);
-    turn            = d.turn;
-    capturedByWhite = JSON.parse(d.capturedByWhite || '[]');
-    capturedByBlack = JSON.parse(d.capturedByBlack || '[]');
-    moveLog         = JSON.parse(d.moveLog || '[]');
-    lastFrom        = JSON.parse(d.lastFrom || 'null');
-    lastTo          = JSON.parse(d.lastTo   || 'null');
-    selected        = null;
-    validMoves      = [];
+      // Hide lobby screens
+      document.getElementById('wait-screen').classList.add('hidden');
+      document.getElementById('join-screen').classList.add('hidden');
+      stopWaitDots();
+      if (!chatRef) initChat();
 
-    // If Firebase already marked game complete (other player triggered it)
-    // show the banner and stop — board is still visible
-    if (d.status === 'complete') {
-      gameActive = false;
-      flipped = (myColor === 'black');
+      // Sync board state
+      board           = JSON.parse(d.board);
+      turn            = d.turn;
+      capturedByWhite = JSON.parse(d.capturedByWhite || '[]');
+      capturedByBlack = JSON.parse(d.capturedByBlack || '[]');
+      moveLog         = JSON.parse(d.moveLog || '[]');
+      lastFrom        = JSON.parse(d.lastFrom || 'null');
+      lastTo          = JSON.parse(d.lastTo   || 'null');
+      selected        = null;
+      validMoves      = [];
+      flipped         = (myColor === 'black');
+
+      // Game already complete in Firebase (other player triggered endGame)
+      if (d.status === 'complete') {
+        gameActive = false;
+        gameEnded  = true;
+        renderBoard();
+        updateSidePanels();
+        const banner = document.getElementById('gameover-banner');
+        if (banner && banner.style.display === 'none') {
+          const inChk = isInCheck(board, turn[0]);
+          if (inChk) {
+            const winner = turn === 'white' ? 'BLACK' : 'WHITE';
+            endGame(winner.toLowerCase() === myColor ? 'YOU WIN!' : 'YOU LOSE',
+                    'Checkmate! ' + winner + ' wins.');
+          } else {
+            endGame('DRAW', 'Stalemate.');
+          }
+        }
+        return;
+      }
+
+      // ── Live game ──
+      gameActive = true;
       renderBoard();
       updateSidePanels();
-      // Show banner if not already showing
-      const banner = document.getElementById('gameover-banner');
-      if (banner && banner.style.display === 'none') {
-        // Determine who won from the title stored or re-derive
-        const prevTurn = turn === 'white' ? 'black' : 'white'; // turn already flipped to loser
-        const inCheck  = isInCheck(board, turn[0]);
-        if (inCheck) {
-          const winner = turn === 'white' ? 'BLACK' : 'WHITE';
-          const youWon = (winner.toLowerCase() === myColor);
-          endGame(youWon ? 'YOU WIN!' : 'YOU LOSE', 'Checkmate! ' + winner + ' wins.');
-        } else {
-          endGame('DRAW', 'Stalemate.');
+
+      const myTurn  = (turn === myColor);
+      const inCheck = isInCheck(board, turn[0]);
+
+      // Only check for game-ending conditions when it's YOUR turn
+      // (you are the one who needs to move — check if you have any moves)
+      if (myTurn) {
+        const hasLegal = hasLegalMoves(turn);
+        if (!hasLegal) {
+          gameEnded = true;
+          if (inCheck) {
+            endGame('YOU LOSE', 'Checkmate! ' + (turn === 'white' ? 'BLACK' : 'WHITE') + ' wins.');
+          } else {
+            endGame('DRAW', 'Stalemate — no legal moves.');
+          }
+          return;
         }
       }
-      return;
-    }
 
-    // Game is live
-    gameActive = true;
-    flipped = (myColor === 'black');
-
-    renderBoard();
-    updateSidePanels();
-
-    // Check for check / checkmate / stalemate
-    const inCheck        = isInCheck(board, turn[0]);
-    const hasLegal       = hasLegalMoves(turn);
-    const myTurn         = (turn === myColor);
-
-    if (!hasLegal) {
-      // Game over — this player detects it and writes to Firebase
+      // Update status bar
       if (inCheck) {
-        const winner = turn === 'white' ? 'BLACK' : 'WHITE';
-        const youWon = (winner.toLowerCase() === myColor);
-        endGame(youWon ? 'YOU WIN!' : 'YOU LOSE', 'Checkmate! ' + winner + ' wins.');
+        updateStatus(myTurn ? 'CHECK! YOUR KING IS IN CHECK' : 'CHECK! ' + turn.toUpperCase() + ' IS IN CHECK');
       } else {
-        endGame('DRAW', 'Stalemate — no legal moves.');
+        updateStatus(myTurn ? 'YOUR TURN' : "OPPONENT'S TURN");
       }
-      return;
-    }
 
-    // Game continues — update status bar
-    if (inCheck) {
-      updateStatus(myTurn ? 'CHECK! YOUR KING IS IN CHECK' : 'CHECK! ' + turn.toUpperCase() + " IS IN CHECK");
-    } else {
-      updateStatus(myTurn ? 'YOUR TURN' : "OPPONENT'S TURN");
+    } catch(e) {
+      console.error('[listenToGame error]', e);
     }
   });
 }
@@ -1608,7 +1614,7 @@ window.copyRoomCode = function() {
 window.resetToLobby = function() {
   // Detach Firebase listener if active
   if (gameRef) { off(gameRef); }
-  gameActive = false; myColor = null; roomId = null; gameRef = null; flipped = false;
+  gameActive = false; gameEnded = false; myColor = null; roomId = null; gameRef = null; flipped = false;
   board = []; selected = null; validMoves = []; turn = 'white';
   capturedByWhite = []; capturedByBlack = []; moveLog = [];
   lastFrom = null; lastTo = null;
