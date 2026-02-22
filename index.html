@@ -812,13 +812,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -842,204 +842,85 @@ const PIECE_SVG = {
   // KING
   K: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
     <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M22.5 2 L22.5 9 M19 5.5 L26 5.5"/>
-      <path d="M22.5 9 C18 9 14 11 12 14 C10 17 10 20 10 24 L10 26
-        C14 24 18 23 22.5 23 C27 23 31 24 35 26 L35 24
-        C35 20 35 17 33 14 C31 11 27 9 22.5 9 Z"/>
-      <path d="M10 26 C10 28 10.5 30 11.5 31 L11.5 36 L33.5 36 L33.5 31
-        C34.5 30 35 28 35 26 C31 24 27 23 22.5 23 C18 23 14 24 10 26 Z"/>
-      <path d="M11.5 36 L10 39 L35 39 L33.5 36"/>
-      <path d="M11 30 L34 30"/>
-      <path d="M11.5 33 L33.5 33"/>
+      <path d="M22.5 2 L22.5 11 M19 6.5 L26 6.5"/>
+      <path d="M19 11
+        C17 13 15 16 15 20
+        C15 24 17 27 19 28
+        L26 28
+        C28 27 30 24 30 20
+        C30 16 28 13 26 11 Z"/>
+      <path d="M19 28 C18 29 17 30 17 32 L28 32 C28 30 27 29 26 28"/>
+      <rect x="12" y="32"   width="21" height="3.5" rx="1.5"/>
+      <rect x="9"  y="35.5" width="27" height="4" rx="2"/>
+      <path d="M15 22 L30 22"/>
     </g></svg>`,
   // QUEEN
   Q: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
     <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="6" cy="12" r="2.75"/><circle cx="14" cy="9" r="2.75"/>
-      <circle cx="22.5" cy="8" r="2.75"/><circle cx="31" cy="9" r="2.75"/><circle cx="39" cy="12" r="2.75"/>
-      <path d="M9 26c8.5-8.5 15.5-8.5 27 0l2.5-12.5L31 25l-.3-14.1-8.2 13.4-8.2-13.4L14 25 6.5 13.5z"/>
-      <path d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1 2.5-1 2.5-1.5 1.5 0 2.5 0 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4"/>
-      <path d="M11.5 30c3.5-1 18.5-1 22 0M12 33.5c4-1.5 17-1.5 21 0"/>
+      <circle cx="8"    cy="13" r="3"/>
+      <circle cx="16"   cy="8"  r="3"/>
+      <circle cx="22.5" cy="6"  r="3"/>
+      <circle cx="29"   cy="8"  r="3"/>
+      <circle cx="37"   cy="13" r="3"/>
+      <path d="M8 13 L11 28 L34 28 L37 13 L29 21 L22.5 9 L16 21 Z"/>
+      <path d="M11 28 C11 30 12 31 13 32 L32 32 C33 31 34 30 34 28"/>
+      <rect x="11" y="32" width="23" height="3.5" rx="1.5"/>
+      <rect x="9"  y="35.5" width="27" height="4" rx="2"/>
     </g></svg>`,
   // ROOK
   R: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
     <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M9 39h27v-3H9zM12 36v-4h21v4zM11 14V9h4v2h5V9h5v2h5V9h4v5"/>
-      <path d="M34 14l-3 3H14l-3-3"/>
-      <path d="M31 17v12.5H14V17"/>
-      <path d="M31 29.5l1.5 2.5h-19l1.5-2.5"/>
-      <path d="M11 14h23" fill="none"/>
+      <rect x="10" y="8"  width="6"  height="8" rx="1"/>
+      <rect x="19.5" y="8" width="6" height="8" rx="1"/>
+      <rect x="29" y="8"  width="6"  height="8" rx="1"/>
+      <path d="M12 16 L12 30 C12 31 13 32 14 32 L31 32 C32 32 33 31 33 30 L33 16 Z"/>
+      <path d="M12 24 L33 24"/>
+      <rect x="9"  y="32" width="27" height="3.5" rx="1.5"/>
+      <rect x="7"  y="35.5" width="31" height="4" rx="2"/>
     </g></svg>`,
   // BISHOP  
   B: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
     <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="22.5" cy="6.5" r="3"/>
-      <path d="M20 9.5 L20 30 C20 31.5 21 32 22.5 32 C24 32 25 31.5 25 30 L25 9.5
-        C24 9.1 23.3 9 22.5 9 C21.7 9 21 9.1 20 9.5 Z"/>
-      <path d="M19.5 19.5 L25.5 19.5"/>
-      <path d="M22.5 16.5 L22.5 22.5"/>
-      <rect x="14.5" y="32" width="16" height="3.5" rx="1"/>
-      <rect x="12" y="35.5" width="21" height="3.5" rx="1"/>
+      <circle cx="22.5" cy="8"  r="3.5"/>
+      <path d="M22.5 11.5
+        C18 14 15 18 15 22
+        C15 26 17 28 19 29
+        L26 29
+        C28 28 30 26 30 22
+        C30 18 27 14 22.5 11.5 Z"/>
+      <path d="M20 29 C19 30 18 31 18 32 L27 32 C27 31 26 30 25 29"/>
+      <rect x="13" y="32" width="19" height="3.5" rx="1.5"/>
+      <rect x="10" y="35.5" width="25" height="4" rx="2"/>
+      <path d="M20.5 8 L24.5 8 M22.5 6 L22.5 10" stroke-width="1.5"/>
     </g></svg>`,
   // KNIGHT
   N: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
     <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="12" y="36" width="21" height="3.5" rx="1.5"/>
-      <path d="M20 36 C19 30 17 27 16 24 C15 21 16 18 18 16
-        C16 15 15 13 16 10 C17 7 19 5 21 5
-        C22 5 23 6 24 7 C26 6 27 5 27 5
-        C28 7 27 10 26 12 C29 13 30 16 29 20
-        C28 23 26 26 25 36 Z"/>
-      <path d="M21 5 C20 3 19 2 20 2 C22 1 25 2 26 4" stroke-width="1"/>
-      <circle cx="24.5" cy="10" r="1.8" fill="STROKE" stroke="none"/>
-      <path d="M18 17 C19 15.5 22 15 24 16" fill="none" stroke-width="1"/>
-      <path d="M16 23 C17 21 19 20 21 21" fill="none" stroke-width="1"/>
+      <rect x="10" y="35.5" width="25" height="4" rx="2"/>
+      <rect x="12" y="32"   width="21" height="3.5" rx="1.5"/>
+      <path d="M26 32
+        C26 26 30 22 30 18
+        C30 13 27 9  24 8
+        C23 7  22 7  21 7
+        C20 5  18 4  17 4
+        C16 6  17 8  18 9
+        C15 10 13 13 13 16
+        C13 19 15 22 15 24
+        C13 25 11 27 11 30
+        C11 31 12 32 13 32
+        L26 32 Z"/>
+      <path d="M18 9 C16 10 14 13 14 16" fill="none" stroke-width="1"/>
+      <circle cx="20" cy="12" r="2" fill="STROKE" stroke="none"/>
+      <path d="M14 20 C16 18 19 18 21 19" fill="none" stroke-width="1"/>
     </g></svg>`,
   // PAWN
   P: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
     <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="22.5" cy="11" r="5"/>
-      <path d="M20 20h5l1.5 8h-8z"/>
-      <path d="M14.5 36.5h16v-3l-2-5.5h-12l-2 5.5z"/>
-    </g></svg>`
-};
-
-function getPieceSVG(p) {
-  if (!p) return '';
-  const type  = p[1];
-  const color = p[0];
-  const fill   = color === 'w' ? '#ffffff' : '#1a1a1a';
-  const stroke = color === 'w' ? 'rgba(0,0,0,0.35)' : '#888888';
-  return PIECE_SVG[type]
-    .replace(/FILL/g, fill)
-    .replace(/STROKE/g, stroke);
-}
-
-function pieceColor(p) { return p ? p[0] : null; }
-function pieceType(p)  { return p ? p[1] : null; }
-function opp(c)        { return c === 'w' ? 'b' : 'w'; }
-
-function initBoard() {
-  const b = Array(8).fill(null).map(() => Array(8).fill(null));
-  const back = ['R','N','B','Q','K','B','N','R'];
-  for (let c = 0; c < 8; c++) {
-    b[0][c] = 'b' + back[c];
-    b[1][c] = 'bP';
-    b[6][c] = 'wP';
-    b[7][c] = 'w' + back[c];
-  }
-  return b;
-}
-
-// ─── Matrix Rain (your existing code) ────────────────────────
-const rainCanvas = document.getElementById('rain-canvas');
-const ctx = rainCanvas.getContext('2d');
-rainCanvas.width  = window.innerWidth;
-rainCanvas.height = window.innerHeight;
-const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:\'",.<>?/～!！@#￥%……&*（）——+【】｛｝；：＂＇，。、《》？';
-const fontSize = 14;
-let columns = Math.floor(rainCanvas.width / fontSize);
-let drops = Array(columns).fill(1);
-function drawRain() {
-  ctx.fillStyle = 'rgba(10,10,10,0.08)';
-  ctx.fillRect(0, 0, rainCanvas.width, rainCanvas.height);
-  ctx.fillStyle = '#00ff88';
-  ctx.font = fontSize + 'px monospace';
-  for (let i = 0; i < drops.length; i++) {
-    ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i*fontSize, drops[i]*fontSize);
-    if (drops[i]*fontSize > rainCanvas.height && Math.random() > 0.975) drops[i] = 0;
-    drops[i]++;
-  }
-}
-setInterval(drawRain, 45);
-window.addEventListener('resize', () => {
-  rainCanvas.width  = window.innerWidth;
-  rainCanvas.height = window.innerHeight;
-  columns = Math.floor(rainCanvas.width / fontSize);
-  drops   = Array(columns).fill(1);
-});
-
-// ─── Build board UI ──────────────────────────────────────────
-function buildBoardUI() {
-  const boardEl = document.getElementById('board');
-  boardEl.innerHTML = '';
-  updateCoords();
-  for (let r = 0; r < 8; r++) {
-    for (let c = 0; c < 8; c++) {
-      const sq = document.createElement('div');
-      sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
-      sq.dataset.r = r; sq.dataset.c = c;
-      sq.addEventListener('click', () => onSquareClick(r, c));
-      // touchend fires faster than click on mobile, prevents 300ms delay
-      sq.addEventListener('touchend', (e) => { e.preventDefault(); onSquareClick(r, c); });
-      boardEl.appendChild(sq);
-    }
-  }
-}
-
-function updateCoords() {
-  const cols = document.getElementById('coord-cols');
-  const rows = document.getElementById('coord-rows');
-  cols.innerHTML = '';
-  rows.innerHTML = '';
-  // Flip coordinate labels for black player
-  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
-  const ranks = flipped ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
-  files.forEach(f => { const s=document.createElement('span');s.textContent=f;cols.appendChild(s); });
-  ranks.forEach(r => { const s=document.createElement('span');s.textContent=r;rows.appendChild(s); });
-}
-
-function applyBoardFlip() {
-  const boardEl = document.getElementById('board');
-  // Flip the whole board visually for black player
-  boardEl.style.transform = flipped ? 'rotate(180deg)' : '';
-  // Counter-rotate each piece so they stay upright
-  document.querySelectorAll('#board .piece').forEach(p => {
-    p.style.transform = flipped ? 'rotate(180deg)' : '';
-  });
-  updateCoords();
-}
-
-function drawMoveArrow() {
-  const overlay = document.getElementById('arrow-overlay');
-  if (!overlay) return;
-  overlay.innerHTML = '';
-  if (!lastFrom || !lastTo) return;
-
-  const boardEl = document.getElementById('board');
-  const sqSize = boardEl.offsetWidth / 8;
-
-  // Map board coords to visual coords (account for flip)
-  function toVisual(r, c) {
-    const vr = flipped ? 7 - r : r;
-    const vc = flipped ? 7 - c : c;
-    return {
-      x: vc * sqSize + sqSize / 2,
-      y: vr * sqSize + sqSize / 2
-    };
-  }
-
-  const from = toVisual(lastFrom[0], lastFrom[1]);
-  const to   = toVisual(lastTo[0],   lastTo[1]);
-
-  // Arrow geometry
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.sqrt(dx*dx + dy*dy);
-  if (len < 1) return;
-  const ux = dx/len, uy = dy/len;
-  const arrowHeadLen = sqSize * 0.38;
-  const shaftEnd = {
-    x: to.x - ux * arrowHeadLen * 0.6,
-    y: to.y - uy * arrowHeadLen * 0.6
-  };
-
-  // Perpendicular for arrowhead wings
-  const px = -uy, py = ux;
-  const hw = arrowHeadLen * 0.38;
-
-  const arrowPath = [
-    `M ${from.x + px*hw*0.5} ${from.y + py*hw*0.5}`,
+      <circle cx="22.5" cy="10" r="5.5"/>
+      <path d="M17.5 16 C15 19 14 22 16 25 C14 25 12 26 12 28 L33 28 C33 26 31 25 29 25 C31 22 30 19 27.5 16 Z"/>
+      <rect x="10" y="28" width="25" height="3.5" rx="1.5"/>
+      <rect x="8"  y="31.5" width="29" height="4" rx="2"/>
+    </g></svg>`,
     `L ${shaftEnd.x + px*hw*0.5} ${shaftEnd.y + py*hw*0.5}`,
     `L ${shaftEnd.x + px*hw} ${shaftEnd.y + py*hw}`,
     `L ${to.x} ${to.y}`,
