@@ -811,13 +811,13 @@ import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverT
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
-  messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT.firebaseapp.com",
+  databaseURL:       "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
 };
 // ──────────────────────────────────────────────────────────────
 
@@ -1360,14 +1360,16 @@ function endGame(title, msg) {
   gameActive = false;
   document.getElementById('gameover-title').textContent = title;
   document.getElementById('gameover-msg').textContent   = msg;
-  // Show banner below board - player can see the final position
   const banner = document.getElementById('gameover-banner');
   if (banner) banner.style.display = 'flex';
-  update(gameRef, { status: 'complete' });
-  // Schedule chat cleanup after 30s so both players can read last messages
-  setTimeout(() => {
-    if (gameRef) update(gameRef, { chat: null });
-  }, 30000);
+  // Write complete status (safe to call multiple times)
+  if (gameRef) {
+    update(gameRef, { status: 'complete' });
+    // Auto-delete chat after 30s
+    setTimeout(() => {
+      if (roomId) { const cRef = ref(db, `chat/${roomId}`); set(cRef, null); }
+    }, 30000);
+  }
 }
 
 // ─── UI helpers ──────────────────────────────────────────────
@@ -1480,27 +1482,23 @@ function listenToGame() {
     if (!snap.exists()) return;
     const d = snap.val();
 
-    // Update online indicators
+    // Always update online indicators
     document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
     document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
 
-    // Still waiting for second player
+    // Still waiting for second player — nothing else to do
     if (d.status === 'waiting') {
       updateStatus('WAITING FOR OPPONENT...');
       return;
     }
 
-    // ── GAME IS ACTIVE ──
-    // Always hide lobby screens and activate the game
+    // ── GAME IS ACTIVE OR COMPLETE ──
     document.getElementById('wait-screen').classList.add('hidden');
     document.getElementById('join-screen').classList.add('hidden');
     stopWaitDots();
-    gameActive = true;
-    flipped = (myColor === 'black');
-    // Init chat once when game first becomes active
     if (!chatRef) initChat();
 
-    // Parse state from Firebase
+    // Sync board state from Firebase
     board           = JSON.parse(d.board);
     turn            = d.turn;
     capturedByWhite = JSON.parse(d.capturedByWhite || '[]');
@@ -1511,19 +1509,59 @@ function listenToGame() {
     selected        = null;
     validMoves      = [];
 
+    // If Firebase already marked game complete (other player triggered it)
+    // show the banner and stop — board is still visible
+    if (d.status === 'complete') {
+      gameActive = false;
+      flipped = (myColor === 'black');
+      renderBoard();
+      updateSidePanels();
+      // Show banner if not already showing
+      const banner = document.getElementById('gameover-banner');
+      if (banner && banner.style.display === 'none') {
+        // Determine who won from the title stored or re-derive
+        const prevTurn = turn === 'white' ? 'black' : 'white'; // turn already flipped to loser
+        const inCheck  = isInCheck(board, turn[0]);
+        if (inCheck) {
+          const winner = turn === 'white' ? 'BLACK' : 'WHITE';
+          const youWon = (winner.toLowerCase() === myColor);
+          endGame(youWon ? 'YOU WIN!' : 'YOU LOSE', 'Checkmate! ' + winner + ' wins.');
+        } else {
+          endGame('DRAW', 'Stalemate.');
+        }
+      }
+      return;
+    }
+
+    // Game is live
+    gameActive = true;
+    flipped = (myColor === 'black');
+
     renderBoard();
     updateSidePanels();
 
-    if (d.status === 'complete') return;
+    // Check for check / checkmate / stalemate
+    const inCheck        = isInCheck(board, turn[0]);
+    const hasLegal       = hasLegalMoves(turn);
+    const myTurn         = (turn === myColor);
 
-    checkGameEnd();
+    if (!hasLegal) {
+      // Game over — this player detects it and writes to Firebase
+      if (inCheck) {
+        const winner = turn === 'white' ? 'BLACK' : 'WHITE';
+        const youWon = (winner.toLowerCase() === myColor);
+        endGame(youWon ? 'YOU WIN!' : 'YOU LOSE', 'Checkmate! ' + winner + ' wins.');
+      } else {
+        endGame('DRAW', 'Stalemate — no legal moves.');
+      }
+      return;
+    }
 
-    const myTurn  = (turn === myColor);
-    const inCheck = isInCheck(board, turn[0]);
+    // Game continues — update status bar
     if (inCheck) {
-      updateStatus('CHECK! ' + turn.toUpperCase() + (myTurn ? ' - YOUR MOVE' : ''));
+      updateStatus(myTurn ? 'CHECK! YOUR KING IS IN CHECK' : 'CHECK! ' + turn.toUpperCase() + " IS IN CHECK");
     } else {
-      updateStatus(myTurn ? 'YOUR TURN - ' + myColor.toUpperCase() : "OPPONENT'S TURN - " + turn.toUpperCase());
+      updateStatus(myTurn ? 'YOUR TURN' : "OPPONENT'S TURN");
     }
   });
 }
@@ -1591,7 +1629,7 @@ let chatListener = null;
 
 function initChat() {
   if (!gameRef || !roomId) return;
-  chatRef = ref(db, `games/${roomId}/chat`);
+  chatRef = ref(db, `chat/${roomId}`);  // Separate from game node to avoid triggering game listener
   document.getElementById('chat-wrap').classList.add('active');
   // Listen for new messages
   chatListener = onValue(chatRef, snap => {
@@ -1624,7 +1662,7 @@ window.sendChat = function() {
   const text = input.value.trim();
   if (!text || !chatRef) return;
   input.value = '';
-  const msgRef = ref(db, `games/${roomId}/chat`);
+  const msgRef = ref(db, `chat/${roomId}`);
   push(msgRef, {
     uid,
     color: myColor,
