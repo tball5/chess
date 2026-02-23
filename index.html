@@ -398,7 +398,9 @@ function renderBoard() {
     if (k && isInCheck(board, col[0])) getSq(...k)?.classList.add('chk');
   });
 
-  // Flip pieces for black
+  // Flip entire board for black so black's pieces are at the bottom
+  // Then counter-rotate each piece so icons stay upright
+  document.getElementById('board').style.transform = flipped ? 'rotate(180deg)' : '';
   document.querySelectorAll('#board .piece').forEach(p => {
     p.style.transform = flipped ? 'rotate(180deg)' : '';
   });
