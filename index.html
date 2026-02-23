@@ -43,7 +43,7 @@ html,body{height:100%;background:var(--bg);font-family:'Share Tech Mono',monospa
 /* Board */
 #board-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;z-index:2}
 #board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(52vmin,430px);height:min(52vmin,430px);border:2px solid var(--gd);box-shadow:0 0 28px rgba(0,255,136,.2),inset 0 0 20px rgba(0,0,0,.8);border-radius:2px;position:relative}
-#arrow-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3}
+
 .coord-row{display:flex;flex-direction:column;justify-content:space-around;height:min(52vmin,430px);width:13px;align-items:center;font-size:8px;color:rgba(0,255,136,.3)}
 .coord-col{display:flex;width:min(52vmin,430px);justify-content:space-around;height:13px;font-size:8px;color:rgba(0,255,136,.3)}
 
@@ -147,7 +147,8 @@ html,body{height:100%;background:var(--bg);font-family:'Share Tech Mono',monospa
       <div class="coord-col" id="coord-cols"></div>
       <div style="display:flex">
         <div class="coord-row" id="coord-rows"></div>
-        <div id="board"><svg id="arrow-svg"></svg></div>
+        <div id="board"></div>
+        <svg id="arrow-svg" style="position:absolute;top:0;left:13px;width:min(52vmin,430px);height:min(52vmin,430px);pointer-events:none;z-index:5;"></svg>
       </div>
     </div>
 
@@ -336,9 +337,7 @@ function initBoard() {
 // Build DOM board squares — called ONCE on page load
 function buildBoard() {
   const el = document.getElementById('board');
-  const arrowSvg = document.getElementById('arrow-svg');
   el.innerHTML = '';
-  el.appendChild(arrowSvg);
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const sq = document.createElement('div');
@@ -414,11 +413,10 @@ function drawArrow() {
   if (!lastFrom || !lastTo) return;
   const boardEl = document.getElementById('board');
   const sz = boardEl.clientWidth / 8;
-  // Board element itself is rotated 180deg for black, so arrow coords
-  // must always use the unflipped grid — the CSS rotation handles the flip.
+  // Arrow SVG is outside the rotating board, so use flipped coords directly
   const vis = (r, c) => ({
-    x: c * sz + sz/2,
-    y: r * sz + sz/2
+    x: (flipped ? 7-c : c) * sz + sz/2,
+    y: (flipped ? 7-r : r) * sz + sz/2
   });
   const F = vis(lastFrom[0], lastFrom[1]);
   const T = vis(lastTo[0],   lastTo[1]);
