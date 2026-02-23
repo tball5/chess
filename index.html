@@ -1,842 +1,326 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>CHESS // TERMINAL</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>CHESS TERMINAL</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet"/>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --g:#00ff88;--gd:#00cc66;--bg:#060a06;
+  --panel:rgba(0,20,10,0.92);--border:rgba(0,255,136,0.2);
+  --ls:#0d2e1a;--ds:#040f08;--lsh:#1a5c35;--dsh:#0a2214;
+  --sel:rgba(0,255,136,0.35);--chk:rgba(255,50,50,0.45);
+}
+html,body{height:100%;background:var(--bg);font-family:'Share Tech Mono',monospace;color:var(--g);overflow:hidden}
+#rain{position:fixed;top:0;left:0;z-index:0;pointer-events:none}
+#app{position:relative;z-index:10;display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:10px;padding:12px}
+#app::before{content:'';position:fixed;inset:0;z-index:1;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.04) 2px,rgba(0,0,0,0.04) 4px);pointer-events:none}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* Header */
+#hdr{text-align:center;z-index:2}
+#hdr h1{font-family:'Orbitron',sans-serif;font-size:clamp(14px,2.5vw,24px);font-weight:900;letter-spacing:.3em;text-shadow:0 0 20px var(--g),0 0 50px var(--gd);animation:pulse 3s ease-in-out infinite}
+#hdr .sub{font-size:10px;letter-spacing:.2em;color:var(--gd);margin-top:2px}
+@keyframes pulse{0%,100%{text-shadow:0 0 20px var(--g),0 0 40px var(--gd)}50%{text-shadow:0 0 30px var(--g),0 0 80px var(--gd),0 0 120px var(--g)}}
 
-  :root {
-    --green: #00ff88;
-    --green-dim: #00cc66;
-    --green-dark: #003322;
-    --bg: #0a0a0a;
-    --panel-bg: rgba(0,20,10,0.85);
-    --border: rgba(0,255,136,0.25);
-    --light-sq: #0d2e1a;
-    --dark-sq: #040f08;
-    --light-sq-hover: #1a5c35;
-    --dark-sq-hover: #0a2214;
-    --selected: rgba(0,255,136,0.35);
-    --valid-move: rgba(0,255,136,0.2);
-    --check: rgba(255,50,50,0.5);
-  }
+/* Status */
+#status-bar{font-family:'Orbitron',sans-serif;font-size:clamp(9px,1.3vw,12px);letter-spacing:.12em;text-align:center;padding:5px 18px;border:1px solid var(--border);background:var(--panel);border-radius:3px;min-width:240px;z-index:2}
 
-  html, body {
-    height: 100%;
-    background: var(--bg);
-    font-family: 'Share Tech Mono', monospace;
-    color: var(--green);
-    overflow: hidden;
-  }
+/* Game area */
+#game-area{display:flex;gap:14px;align-items:center;justify-content:center;z-index:2}
 
-  /* Matrix rain canvas passed through */
-  #rain-canvas {
-    position: fixed; top: 0; left: 0; z-index: 0; pointer-events: none;
-  }
+/* Side panels */
+.side-panel{width:150px;background:var(--panel);border:1px solid var(--border);border-radius:4px;padding:10px;display:flex;flex-direction:column;gap:8px;font-size:11px}
+.slabel{font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:.2em;color:var(--gd);border-bottom:1px solid var(--border);padding-bottom:3px;margin-bottom:2px}
+.pcard{padding:7px;border:1px solid var(--border);border-radius:3px;background:rgba(0,255,136,.03);transition:all .3s}
+.pcard.active-turn{border-color:var(--g);background:rgba(0,255,136,.08);box-shadow:0 0 10px rgba(0,255,136,.15)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+.dot.w{background:#fff;box-shadow:0 0 5px #fff}.dot.b{background:#333;border:1px solid #555}
+.pname{font-size:10px}.pstatus{font-size:9px;color:var(--gd);margin-top:2px}
+#move-log{max-height:110px;overflow-y:auto;font-size:9px;line-height:1.8;color:var(--gd);scrollbar-width:thin}
 
-  /* ── Layout ── */
-  #app {
-    position: relative; z-index: 10;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    height: 100vh; gap: 12px;
-    padding: 16px;
-  }
+/* Board */
+#board-wrap{position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;z-index:2}
+#board{display:grid;grid-template-columns:repeat(8,1fr);grid-template-rows:repeat(8,1fr);width:min(52vmin,430px);height:min(52vmin,430px);border:2px solid var(--gd);box-shadow:0 0 28px rgba(0,255,136,.2),inset 0 0 20px rgba(0,0,0,.8);border-radius:2px;position:relative}
+#arrow-svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.coord-row{display:flex;flex-direction:column;justify-content:space-around;height:min(52vmin,430px);width:13px;align-items:center;font-size:8px;color:rgba(0,255,136,.3)}
+.coord-col{display:flex;width:min(52vmin,430px);justify-content:space-around;height:13px;font-size:8px;color:rgba(0,255,136,.3)}
 
-  /* ── Header ── */
-  #header {
-    text-align: center;
-  }
-  #header h1 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(18px, 3vw, 28px);
-    font-weight: 900;
-    letter-spacing: 0.3em;
-    text-transform: uppercase;
-    text-shadow: 0 0 20px var(--green), 0 0 60px var(--green-dim);
-    animation: pulse 3s ease-in-out infinite;
-  }
-  #header .sub {
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    color: var(--green-dim);
-    margin-top: 2px;
-  }
-  @keyframes pulse {
-    0%,100% { text-shadow: 0 0 20px var(--green), 0 0 40px var(--green-dim); }
-    50% { text-shadow: 0 0 30px var(--green), 0 0 80px var(--green-dim), 0 0 120px var(--green); }
-  }
+.sq{position:relative;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:background .12s;user-select:none;-webkit-tap-highlight-color:transparent}
+.sq.light{background:var(--ls)}.sq.dark{background:var(--ds)}
+.sq.light:hover{background:var(--lsh)}.sq.dark:hover{background:var(--dsh)}
+.sq.sel{background:var(--sel)!important;box-shadow:inset 0 0 0 2px var(--g)}
+.sq.vm::after{content:'';position:absolute;width:32%;height:32%;border-radius:50%;background:var(--g);opacity:.55;box-shadow:0 0 6px var(--g)}
+.sq.vc::after{content:'';position:absolute;inset:2px;border:2px solid var(--g);opacity:.6;border-radius:1px}
+.sq.chk{background:var(--chk)!important}
+.sq.lm{background:rgba(0,255,136,.1)!important}
 
-  /* ── Main game area ── */
-  #game-area {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
+/* Pieces */
+.piece{width:88%;height:88%;pointer-events:none;z-index:2;display:flex;align-items:center;justify-content:center;transition:transform .1s;filter:drop-shadow(0 2px 4px rgba(0,0,0,.8))}
+.piece svg{width:100%;height:100%;overflow:visible}
 
-  /* ── Side panels ── */
-  .side-panel {
-    width: 160px;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 12px;
-    backdrop-filter: blur(8px);
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    font-size: 12px;
-  }
-  .side-panel .section-label {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 9px;
-    letter-spacing: 0.2em;
-    color: var(--green-dim);
-    border-bottom: 1px solid var(--border);
-    padding-bottom: 4px;
-    margin-bottom: 2px;
-  }
-  .player-card {
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    background: rgba(0,255,136,0.03);
-    transition: all 0.3s;
-  }
-  .player-card.active-turn {
-    border-color: var(--green);
-    background: rgba(0,255,136,0.08);
-    box-shadow: 0 0 12px rgba(0,255,136,0.15);
-  }
-  .player-card .color-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    display: inline-block;
-    margin-right: 6px;
-    vertical-align: middle;
-    box-shadow: 0 0 6px currentColor;
-  }
-  .player-card .color-dot.white { background: #fff; color: #fff; }
-  .player-card .color-dot.black { background: #333; color: #333; border: 1px solid #555; }
-  .player-card .name { font-size: 11px; }
-  .player-card .status { font-size: 10px; color: var(--green-dim); margin-top: 3px; }
+/* Screens */
+.screen{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;background:rgba(0,0,0,.9);backdrop-filter:blur(4px)}
+.screen.hidden{display:none}
+.sbox{background:var(--panel);border:1px solid var(--gd);border-radius:4px;padding:28px 36px;text-align:center;box-shadow:0 0 40px rgba(0,255,136,.12);max-width:380px;width:90%}
+.sbox h2{font-family:'Orbitron',sans-serif;font-size:18px;letter-spacing:.22em;margin-bottom:8px;text-shadow:0 0 18px var(--g)}
+.sbox p{font-size:11px;color:var(--gd);margin-bottom:18px;line-height:1.7}
+.btn{font-family:'Share Tech Mono',monospace;font-size:13px;letter-spacing:.18em;padding:11px 26px;border:1px solid var(--g);background:rgba(0,255,136,.07);color:var(--g);border-radius:3px;cursor:pointer;transition:all .2s;text-transform:uppercase;width:100%;margin-bottom:8px}
+.btn:hover{background:rgba(0,255,136,.18);box-shadow:0 0 18px rgba(0,255,136,.3)}
+.btn.sec{border-color:var(--gd);color:var(--gd);background:transparent;font-size:11px;padding:8px}
+.btn.sec:hover{border-color:var(--g);color:var(--g)}
+.inp{font-family:'Share Tech Mono',monospace;font-size:16px;padding:10px 12px;background:rgba(0,20,10,.8);border:1px solid var(--gd);color:var(--g);border-radius:3px;width:100%;margin-bottom:10px;letter-spacing:.15em;outline:none;text-align:center}
+.inp:focus{border-color:var(--g)}
+.room-code{font-size:12px;color:var(--gd);margin-top:14px;padding:8px;border:1px solid var(--border);border-radius:3px;cursor:pointer;letter-spacing:.12em}
+.room-code:hover{border-color:var(--g);color:var(--g)}
+.dots::after{content:'';animation:dotanim 1.4s steps(4,end) infinite}
+@keyframes dotanim{0%{content:''}25%{content:'.'}50%{content:'..'}75%{content:'...'}100%{content:''}}
 
-  .captured-pieces { min-height: 40px; letter-spacing: 1px; line-height: 1.6; font-size: 14px; }
+/* Game over */
+#go-banner{display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:60;background:rgba(0,10,5,.97);border:1px solid var(--g);border-radius:6px;padding:28px 40px;text-align:center;box-shadow:0 0 40px rgba(0,255,136,.25)}
+#go-title{font-family:'Orbitron',sans-serif;font-size:28px;letter-spacing:.25em;text-shadow:0 0 20px var(--g)}
+#go-msg{font-size:12px;color:var(--gd);margin:10px 0 18px;letter-spacing:.1em}
 
-  /* Move log */
-  #move-log-list {
-    max-height: 120px;
-    overflow-y: auto;
-    font-size: 10px;
-    line-height: 1.8;
-    color: var(--green-dim);
-    scrollbar-width: thin;
-    scrollbar-color: var(--green-dim) transparent;
-  }
-  #move-log-list::-webkit-scrollbar { width: 3px; }
-  #move-log-list::-webkit-scrollbar-thumb { background: var(--green-dim); }
+/* Promo */
+#promo{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.75)}
+#promo-inner{background:var(--panel);border:1px solid var(--g);border-radius:4px;padding:20px;display:flex;gap:10px;box-shadow:0 0 40px rgba(0,255,136,.3)}
+.pbtn{width:60px;height:60px;background:rgba(0,255,136,.07);border:1px solid var(--border);border-radius:3px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.pbtn:hover{background:rgba(0,255,136,.18);border-color:var(--g)}
+.pbtn svg{width:50px;height:50px}
 
-  /* ── Chess Board ── */
-  #board-wrap {
-    position: relative;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
-  }
+/* Chat */
+#chat-wrap{display:none;flex-direction:column;width:min(52vmin,430px);max-height:100px;border:1px solid var(--border);border-radius:3px;background:var(--panel);z-index:2}
+#chat-wrap.on{display:flex}
+#chat-msgs{flex:1;overflow-y:auto;padding:5px 8px;font-size:10px;line-height:1.6;scrollbar-width:thin}
+.cmsg{margin-bottom:1px}.cmsg.me{color:var(--g)}.cmsg.them{color:var(--gd)}
+#chat-row{display:flex;border-top:1px solid var(--border)}
+#chat-inp{flex:1;background:transparent;border:none;color:var(--g);font-family:'Share Tech Mono',monospace;font-size:11px;padding:5px 8px;outline:none}
+#chat-send{background:transparent;border:none;border-left:1px solid var(--border);color:var(--gd);font-family:'Share Tech Mono',monospace;font-size:10px;padding:5px 10px;cursor:pointer}
+#chat-send:hover{color:var(--g)}
 
-  #board {
-    display: grid;
-    grid-template-columns: repeat(8, 1fr);
-    grid-template-rows: repeat(8, 1fr);
-    width: min(52vmin, 440px);
-    height: min(52vmin, 440px);
-    border: 2px solid var(--green-dim);
-    box-shadow: 0 0 30px rgba(0,255,136,0.25), 0 0 80px rgba(0,255,136,0.08), inset 0 0 20px rgba(0,0,0,0.8);
-    border-radius: 2px;
-  }
-
-  .sq {
-    position: relative;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    transition: background 0.15s;
-    user-select: none;
-  }
-  .sq.light { background: var(--light-sq); }
-  .sq.dark  { background: var(--dark-sq); }
-  .sq.light:hover { background: var(--light-sq-hover); }
-  .sq.dark:hover  { background: var(--dark-sq-hover); }
-  .sq.selected { background: var(--selected) !important; box-shadow: inset 0 0 0 2px var(--green); }
-  .sq.valid-move::after {
-    content: '';
-    position: absolute;
-    width: 30%; height: 30%;
-    border-radius: 50%;
-    background: var(--green);
-    opacity: 0.5;
-    box-shadow: 0 0 8px var(--green);
-  }
-  .sq.valid-capture::after {
-    content: '';
-    position: absolute;
-    inset: 2px;
-    border-radius: 1px;
-    border: 2px solid var(--green);
-    opacity: 0.6;
-  }
-  .sq.in-check { background: var(--check) !important; }
-  .sq.last-move { background: rgba(0,255,136,0.12) !important; }
-
-  /* Piece - SVG based */
-  .piece {
-    width: 88%;
-    height: 88%;
-    z-index: 2;
-    pointer-events: none;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.1s;
-    filter: drop-shadow(0 2px 3px rgba(0,0,0,0.7));
-  }
-  .piece svg {
-    width: 100%;
-    height: 100%;
-    overflow: visible;
-  }
-  .piece-w { filter: drop-shadow(0 1px 3px rgba(0,0,0,0.8)); }
-  .piece-b { filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5)); }
-  .sq:active .piece { transform: scale(0.88); }
-
-  /* Board coordinates */
-  .coord-row, .coord-col {
-    display: flex;
-    font-size: 9px;
-    color: rgba(0,255,136,0.35);
-    letter-spacing: 0.1em;
-  }
-  .coord-row { flex-direction: column; justify-content: space-around; height: min(52vmin, 440px); width: 14px; align-items: center; }
-  .coord-col { width: min(52vmin, 440px); justify-content: space-around; height: 14px; }
-
-  /* ── Status bar ── */
-  #status-bar {
-    font-family: 'Orbitron', sans-serif;
-    font-size: clamp(10px, 1.5vw, 13px);
-    letter-spacing: 0.15em;
-    text-align: center;
-    color: var(--green);
-    padding: 6px 20px;
-    border: 1px solid var(--border);
-    background: var(--panel-bg);
-    border-radius: 3px;
-    min-width: 260px;
-    backdrop-filter: blur(8px);
-    animation: statusPulse 1s ease-in-out;
-  }
-  @keyframes statusPulse {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  /* ── Screens ── */
-  .screen {
-    position: fixed; inset: 0; z-index: 50;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    gap: 24px;
-    background: rgba(0,0,0,0.88);
-    backdrop-filter: blur(4px);
-  }
-  .screen.hidden { display: none; }
-
-  .screen-box {
-    background: var(--panel-bg);
-    border: 1px solid var(--green-dim);
-    border-radius: 4px;
-    padding: 32px 40px;
-    text-align: center;
-    box-shadow: 0 0 40px rgba(0,255,136,0.15);
-    max-width: 400px;
-    width: 90%;
-    animation: fadeIn 0.4s ease;
-  }
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .screen-box h2 {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 20px;
-    letter-spacing: 0.25em;
-    margin-bottom: 8px;
-    text-shadow: 0 0 20px var(--green);
-  }
-  .screen-box p {
-    font-size: 12px;
-    color: var(--green-dim);
-    margin-bottom: 20px;
-    line-height: 1.7;
-  }
-  .btn {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 13px;
-    letter-spacing: 0.2em;
-    padding: 12px 28px;
-    border: 1px solid var(--green);
-    background: rgba(0,255,136,0.07);
-    color: var(--green);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.2s;
-    text-transform: uppercase;
-  }
-  .btn:hover {
-    background: rgba(0,255,136,0.18);
-    box-shadow: 0 0 20px rgba(0,255,136,0.3);
-    transform: translateY(-1px);
-  }
-  .btn:active { transform: translateY(0); }
-  .btn.secondary {
-    border-color: var(--green-dim);
-    color: var(--green-dim);
-    background: transparent;
-    font-size: 11px;
-    padding: 8px 20px;
-  }
-  .btn.secondary:hover {
-    border-color: var(--green);
-    color: var(--green);
-    box-shadow: none;
-  }
-
-  .room-id-display {
-    font-size: 11px;
-    color: var(--green-dim);
-    margin-top: 16px;
-    padding: 8px;
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    cursor: pointer;
-    letter-spacing: 0.1em;
-    transition: all 0.2s;
-  }
-  .room-id-display:hover { border-color: var(--green-dim); color: var(--green); }
-
-  .input-field {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 13px;
-    padding: 10px 14px;
-    background: rgba(0,20,10,0.8);
-    border: 1px solid var(--green-dim);
-    color: var(--green);
-    border-radius: 3px;
-    width: 100%;
-    margin-bottom: 12px;
-    letter-spacing: 0.1em;
-    outline: none;
-    transition: border-color 0.2s;
-  }
-  .input-field:focus { border-color: var(--green); box-shadow: 0 0 10px rgba(0,255,136,0.15); }
-  .input-field::placeholder { color: rgba(0,255,136,0.3); }
-
-  #connecting-dots::after {
-    content: '';
-    animation: dots 1.5s steps(4, end) infinite;
-  }
-  @keyframes dots {
-    0%   { content: ''; }
-    25%  { content: '.'; }
-    50%  { content: '..'; }
-    75%  { content: '...'; }
-    100% { content: ''; }
-  }
-
-  /* Promotion modal */
-  #promo-modal {
-    position: fixed; inset: 0; z-index: 100;
-    display: flex; align-items: center; justify-content: center;
-    background: rgba(0,0,0,0.7);
-  }
-  #promo-modal.hidden { display: none; }
-  #promo-choices {
-    background: var(--panel-bg);
-    border: 1px solid var(--green);
-    border-radius: 4px;
-    padding: 20px;
-    display: flex; gap: 12px;
-    box-shadow: 0 0 40px rgba(0,255,136,0.3);
-  }
-  .promo-btn {
-    width: 64px;
-    height: 64px;
-    padding: 6px;
-    background: rgba(0,255,136,0.07);
-    border: 1px solid var(--border);
-    border-radius: 3px;
-    cursor: pointer;
-    transition: all 0.15s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-  .promo-btn svg { width: 100%; height: 100%; }
-  .promo-btn:hover {
-    background: rgba(0,255,136,0.18);
-    border-color: var(--green);
-    box-shadow: 0 0 15px rgba(0,255,136,0.3);
-  }
-
-  /* Scanline overlay */
-  #app::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 5;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0,0,0,0.03) 2px,
-      rgba(0,0,0,0.03) 4px
-    );
-    pointer-events: none;
-  }
-
-  /* ── Chat ── */
-  #chat-wrap {
-    width: min(52vmin, 440px);
-    margin-top: 6px;
-    background: var(--panel-bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    backdrop-filter: blur(8px);
-    display: none; /* shown when game active */
-    flex-direction: column;
-    overflow: hidden;
-  }
-  #chat-wrap.active { display: flex; }
-  #chat-messages {
-    height: 80px;
-    overflow-y: auto;
-    padding: 6px 10px;
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    scrollbar-width: thin;
-    scrollbar-color: var(--green-dim) transparent;
-  }
-  #chat-messages::-webkit-scrollbar { width: 3px; }
-  #chat-messages::-webkit-scrollbar-thumb { background: var(--green-dim); }
-  .chat-msg {
-    font-size: 10px;
-    line-height: 1.4;
-    word-break: break-word;
-  }
-  .chat-msg .chat-who {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 8px;
-    letter-spacing: 0.1em;
-    margin-right: 5px;
-  }
-  .chat-msg.mine .chat-who { color: var(--green); }
-  .chat-msg.theirs .chat-who { color: var(--green-dim); }
-  .chat-msg.mine .chat-text { color: rgba(0,255,136,0.9); }
-  .chat-msg.theirs .chat-text { color: rgba(0,255,136,0.55); }
-  #chat-input-row {
-    display: flex;
-    border-top: 1px solid var(--border);
-  }
-  #chat-input {
-    flex: 1;
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 11px;
-    padding: 6px 10px;
-    background: transparent;
-    border: none;
-    color: var(--green);
-    outline: none;
-    letter-spacing: 0.05em;
-  }
-  #chat-input::placeholder { color: rgba(0,255,136,0.25); }
-  #chat-send {
-    font-family: 'Share Tech Mono', monospace;
-    font-size: 10px;
-    padding: 6px 10px;
-    background: transparent;
-    border: none;
-    border-left: 1px solid var(--border);
-    color: var(--green-dim);
-    cursor: pointer;
-    letter-spacing: 0.1em;
-    transition: color 0.15s;
-  }
-  #chat-send:hover { color: var(--green); }
-
-  /* ── Mobile ── */
-  @media (max-width: 640px) {
-
-    html, body { overflow: hidden; height: 100%; height: 100dvh; }
-
-    #app {
-      height: 100dvh;
-      padding: 0;
-      gap: 0;
-      justify-content: space-between;
-    }
-
-    /* Compact header strip */
-    #header {
-      width: 100%;
-      padding: 8px 12px 4px;
-      background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(6px);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #header h1 {
-      font-size: 13px;
-      letter-spacing: 0.15em;
-    }
-    #header .sub { display: none; }
-
-    /* Status bar pinned above board */
-    #status-bar {
-      width: 100%;
-      min-width: unset;
-      border-radius: 0;
-      border-left: none;
-      border-right: none;
-      font-size: 11px;
-      letter-spacing: 0.08em;
-      padding: 7px 12px;
-      flex-shrink: 0;
-    }
-
-    /* Game area: stack vertically, board fills middle */
-    #game-area {
-      flex: 1;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      width: 100%;
-      gap: 0;
-      padding: 4px 0;
-    }
-
-    /* Hide side panels entirely on mobile */
-    .side-panel { display: none !important; }
-
-    /* Board wrap and board fill available space */
-    #board-wrap {
-      gap: 2px;
-      width: 100%;
-      align-items: center;
-    }
-
-    /* Coordinates scaled down */
-    .coord-row {
-      width: 10px;
-      font-size: 7px;
-      height: min(96vw, 96vh - 140px) !important;
-    }
-    .coord-col {
-      font-size: 7px;
-      width: min(96vw, 96vh - 140px) !important;
-    }
-
-    /* Board: use almost full viewport width, keep square */
-    #board {
-      width: min(96vw, calc(100dvh - 140px));
-      height: min(96vw, calc(100dvh - 140px));
-      border-width: 1px;
-      touch-action: manipulation;
-    }
-
-    /* Bigger tap targets, larger pieces */
-    .sq {
-      -webkit-tap-highlight-color: transparent;
-      touch-action: manipulation;
-    }
-    .sq:active { opacity: 0.85; }
-
-    .piece {
-      font-size: clamp(22px, 10vw, 52px);
-    }
-
-    /* Larger valid move dots */
-    .sq.valid-move::after {
-      width: 36%; height: 36%;
-    }
-
-    /* Lobby screens */
-    .screen-box {
-      padding: 24px 20px;
-      width: 92%;
-    }
-    .screen-box h2 { font-size: 16px; }
-    .screen-box p  { font-size: 11px; }
-
-    .btn {
-      font-size: 14px;
-      padding: 14px 20px;
-      border-radius: 6px;
-      /* Bigger tap target */
-      min-height: 48px;
-    }
-    .btn.secondary {
-      font-size: 12px;
-      min-height: 44px;
-    }
-
-    .input-field {
-      font-size: 18px; /* Prevents iOS zoom on focus */
-      padding: 14px 16px;
-      min-height: 48px;
-      border-radius: 6px;
-      letter-spacing: 0.2em;
-      text-align: center;
-    }
-
-    .room-id-display {
-      font-size: 18px;
-      letter-spacing: 0.25em;
-      padding: 12px;
-      margin-top: 12px;
-    }
-
-    /* Promotion modal bigger buttons on mobile */
-    .promo-btn {
-      font-size: 48px;
-      padding: 14px;
-      min-width: 60px;
-      min-height: 60px;
-    }
-
-    /* Chat on mobile - compact strip */
-    #chat-wrap {
-      width: 100%;
-      border-radius: 0;
-      border-left: none;
-      border-right: none;
-      border-top: none;
-    }
-    #chat-messages { height: 60px; }
-    #chat-input { font-size: 16px; }
-
-    /* Mobile player strip at bottom of screen */
-    #mobile-bar {
-      display: flex !important;
-      width: 100%;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(6px);
-      border-top: 1px solid var(--border);
-      padding: 6px 16px;
-      justify-content: space-between;
-      align-items: center;
-      flex-shrink: 0;
-    }
-    .mobile-player {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 11px;
-      font-family: 'Share Tech Mono', monospace;
-    }
-    .mobile-player .dot {
-      width: 8px; height: 8px;
-      border-radius: 50%;
-      flex-shrink: 0;
-    }
-    .mobile-player.active { color: var(--green); }
-    .mobile-player.inactive { color: var(--green-dim); opacity: 0.6; }
-    .mobile-you-tag {
-      font-size: 9px;
-      color: var(--green-dim);
-      letter-spacing: 0.1em;
-    }
-  }
+/* Mobile */
+#mob-bar{display:none;width:100%;background:rgba(0,0,0,.7);border-top:1px solid var(--border);padding:5px 14px;justify-content:space-between;align-items:center;flex-shrink:0;z-index:2}
+@media(max-width:640px){
+  #app{height:100dvh;padding:0;gap:0;justify-content:space-between}
+  #hdr{width:100%;padding:6px 12px;background:rgba(0,0,0,.6);border-bottom:1px solid var(--border);flex-shrink:0}
+  #hdr h1{font-size:12px;letter-spacing:.12em}#hdr .sub{display:none}
+  #status-bar{width:100%;min-width:unset;border-radius:0;border-left:none;border-right:none;font-size:10px;padding:6px 10px;flex-shrink:0}
+  #game-area{flex:1;flex-direction:column;width:100%;gap:0;padding:3px 0;justify-content:center}
+  .side-panel{display:none!important}
+  #board-wrap{gap:1px;width:100%;align-items:center}
+  #board{width:min(98vw,calc(100dvh - 120px));height:min(98vw,calc(100dvh - 120px));border-width:1px}
+  .coord-row{height:min(98vw,calc(100dvh - 120px))!important;width:10px;font-size:6px}
+  .coord-col{width:min(98vw,calc(100dvh - 120px))!important;font-size:6px}
+  #chat-wrap{width:100%;max-height:80px;border-radius:0;border-left:none;border-right:none}
+  #mob-bar{display:flex}
+  .mob-player{display:flex;align-items:center;gap:5px;font-size:10px}
+  .mob-player .mob-dot{width:7px;height:7px;border-radius:50%}
+  .mob-player.active{color:var(--g)}.mob-player.inactive{color:var(--gd);opacity:.6}
+  #go-banner{width:85%;padding:20px 24px}#go-title{font-size:20px}
+  .sbox{padding:20px 18px}.btn{font-size:14px;min-height:46px}.inp{font-size:18px;min-height:46px}
+}
 </style>
 </head>
 <body>
-
-<!-- Matrix Rain Canvas (from your existing code) -->
-<canvas id="rain-canvas"></canvas>
-
-<!-- ── JOIN/CREATE SCREEN ── -->
-<div id="join-screen" class="screen">
-  <div class="screen-box">
-    <h2>// CHESS TERMINAL</h2>
-    <p>Anonymous auth — no account needed.<br>Two players per room maximum.</p>
-    <div id="join-options">
-      <button class="btn" onclick="createRoom()" style="width:100%;margin-bottom:10px;">[ CREATE NEW GAME ]</button>
-      <input id="room-input" class="input-field" type="number" placeholder="Enter 3-digit code..." min="100" max="999" style="-moz-appearance:textfield;appearance:textfield;">
-      <button class="btn secondary" onclick="joinRoom()" style="width:100%;">[ JOIN EXISTING GAME ]</button>
-    </div>
-    <div id="connecting-msg" style="display:none; color:var(--green-dim); font-size:12px;">
-      Connecting<span id="connecting-dots"></span>
-    </div>
-  </div>
-</div>
-
-<!-- ── WAITING SCREEN ── -->
-<div id="wait-screen" class="screen hidden">
-  <div class="screen-box">
-    <h2>AWAITING OPPONENT</h2>
-    <p>You are playing as <span id="your-color-display" style="color:var(--green);font-weight:bold;"></span><br>Share this code with your opponent:</p>
-    <div id="share-room-code" class="room-id-display" onclick="copyRoomCode()" title="Click to copy">
-      🔑 <span id="room-code-display"></span> — click to copy
-    </div>
-    <p style="margin-top:16px;font-size:11px;">Waiting for player 2<span id="wait-dots"></span></p>
-  </div>
-</div>
-
-<!-- ── GAME OVER SCREEN (fullscreen removed - now shows as banner) ── -->
-<div id="gameover-screen" class="hidden"></div>
-
-<!-- ── PROMOTION MODAL ── -->
-<div id="promo-modal" class="hidden">
-  <div id="promo-choices"></div>
-</div>
-
-<!-- ── MAIN APP ── -->
+<canvas id="rain"></canvas>
 <div id="app">
-  <div id="header">
+  <div id="hdr">
     <h1>// CHESS TERMINAL //</h1>
     <div class="sub">REALTIME · ANONYMOUS · ENCRYPTED</div>
   </div>
 
-  <div id="game-area">
-    <!-- Left panel: Black player -->
-    <div class="side-panel" id="panel-black">
-      <div>
-        <div class="section-label">PLAYER_02</div>
-        <div class="player-card" id="card-black">
-          <span class="color-dot black"></span>
-          <span class="name" id="name-black">BLACK</span>
-          <div class="status" id="status-black">waiting...</div>
-        </div>
-      </div>
-      <div>
-        <div class="section-label">CAPTURED</div>
-        <div class="captured-pieces" id="captured-by-black"></div>
-      </div>
-    </div>
-
-    <!-- Board -->
-    <div id="board-wrap">
-      <div class="coord-col" id="coord-cols"></div>
-      <div style="display:flex;">
-        <div class="coord-row" id="coord-rows"></div>
-        <div style="position:relative;">
-          <div id="board"></div>
-          <svg id="arrow-overlay" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:8;overflow:visible;"></svg>
-        </div>
-      </div>
-    </div>
-
-    <!-- Right panel: White player + moves -->
-    <div class="side-panel" id="panel-white">
-      <div>
-        <div class="section-label">PLAYER_01</div>
-        <div class="player-card" id="card-white">
-          <span class="color-dot white"></span>
-          <span class="name" id="name-white">WHITE</span>
-          <div class="status" id="status-white">waiting...</div>
-        </div>
-      </div>
-      <div>
-        <div class="section-label">CAPTURED</div>
-        <div class="captured-pieces" id="captured-by-white"></div>
-      </div>
-      <div>
-        <div class="section-label">MOVE_LOG</div>
-        <div id="move-log-list"></div>
-      </div>
-    </div>
-  </div>
-
   <div id="status-bar">INITIALIZING...</div>
 
-  <!-- Game over banner - fixed overlay, board visible underneath -->
-  <div id="gameover-banner" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:60; flex-direction:column; align-items:center; gap:12px; padding:28px 36px; background:rgba(0,15,8,0.96); border:1px solid var(--green); border-radius:6px; text-align:center; backdrop-filter:blur(12px); box-shadow:0 0 60px rgba(0,255,136,0.2), 0 0 120px rgba(0,255,136,0.08); min-width:240px;">
-    <div id="gameover-title" style="font-family:'Orbitron',sans-serif; font-size:22px; letter-spacing:0.25em; text-shadow:0 0 30px var(--green); color:var(--green);">GAME OVER</div>
-    <div id="gameover-msg" style="font-size:12px; color:var(--green-dim); letter-spacing:0.1em; line-height:1.6;"></div>
-    <div style="font-size:10px; color:rgba(0,255,136,0.35); letter-spacing:0.1em;">BOARD VISIBLE BELOW</div>
-    <button class="btn" onclick="resetToLobby()" style="margin-top:4px; padding:10px 28px; font-size:12px; letter-spacing:0.2em;">[ NEW GAME ]</button>
+  <div id="game-area">
+    <div class="side-panel">
+      <div class="slabel">PLAYER</div>
+      <div class="pcard" id="card-black">
+        <span class="dot b"></span><span class="pname" id="name-black">BLACK</span>
+        <div class="pstatus" id="conn-black">offline</div>
+      </div>
+      <div class="slabel">MOVE LOG</div>
+      <div id="move-log"></div>
+    </div>
+
+    <div id="board-wrap">
+      <div class="coord-col" id="coord-cols"></div>
+      <div style="display:flex">
+        <div class="coord-row" id="coord-rows"></div>
+        <div id="board"><svg id="arrow-svg"></svg></div>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="slabel">PLAYER</div>
+      <div class="pcard" id="card-white">
+        <span class="dot w"></span><span class="pname" id="name-white">WHITE</span>
+        <div class="pstatus" id="conn-white">offline</div>
+      </div>
+    </div>
   </div>
 
-  <!-- ── CHAT BOX ── -->
   <div id="chat-wrap">
-    <div id="chat-messages"></div>
-    <div id="chat-input-row">
-      <input id="chat-input" type="text" placeholder="message..." maxlength="120" autocomplete="off">
+    <div id="chat-msgs"></div>
+    <div id="chat-row">
+      <input id="chat-inp" placeholder="message..." maxlength="120"/>
       <button id="chat-send" onclick="sendChat()">SEND</button>
     </div>
   </div>
 
-  <!-- Mobile player strip (hidden on desktop, shown on mobile via CSS) -->
-  <div id="mobile-bar" style="display:none;">
-    <div class="mobile-player" id="mobile-white">
-      <div class="dot" style="background:#fff;box-shadow:0 0 4px #fff;"></div>
-      <div>
-        <div id="mobile-name-white">WHITE</div>
-        <div class="mobile-you-tag" id="mobile-status-white"></div>
-      </div>
+  <div id="mob-bar">
+    <div class="mob-player inactive" id="mob-black">
+      <div class="mob-dot" style="background:#333;border:1px solid #666"></div>
+      <div><div id="mob-name-b">BLACK</div><div style="font-size:8px;color:var(--gd)" id="mob-stat-b"></div></div>
     </div>
-    <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:0.15em;color:var(--green-dim);">VS</div>
-    <div class="mobile-player" id="mobile-black" style="flex-direction:row-reverse;text-align:right;">
-      <div class="dot" style="background:#333;border:1px solid #666;box-shadow:0 0 4px #555;"></div>
-      <div>
-        <div id="mobile-name-black">BLACK</div>
-        <div class="mobile-you-tag" id="mobile-status-black"></div>
-      </div>
+    <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:.12em;color:var(--gd)">VS</div>
+    <div class="mob-player inactive" id="mob-white" style="flex-direction:row-reverse;text-align:right">
+      <div class="mob-dot" style="background:#fff;box-shadow:0 0 4px #fff"></div>
+      <div><div id="mob-name-w">WHITE</div><div style="font-size:8px;color:var(--gd)" id="mob-stat-w"></div></div>
     </div>
   </div>
 </div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
-<!--  FIREBASE  (replace config with yours)                    -->
-<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- JOIN SCREEN -->
+<div id="join-screen" class="screen">
+  <div class="sbox">
+    <h2>// CHESS TERMINAL</h2>
+    <p>Anonymous realtime chess.<br>Create a room or join with a 3-digit code.</p>
+    <div id="join-opts">
+      <button class="btn" onclick="createRoom()">[ CREATE NEW GAME ]</button>
+      <input id="room-inp" class="inp" placeholder="ENTER 3-DIGIT CODE" maxlength="3" inputmode="numeric"/>
+      <button class="btn sec" onclick="joinRoom()">[ JOIN EXISTING GAME ]</button>
+    </div>
+    <div id="conn-msg" style="display:none;color:var(--gd);font-size:12px;letter-spacing:.1em">CONNECTING<span class="dots"></span></div>
+  </div>
+</div>
+
+<!-- WAIT SCREEN -->
+<div id="wait-screen" class="screen hidden">
+  <div class="sbox">
+    <h2>AWAITING OPPONENT</h2>
+    <p>Share this code with your opponent:</p>
+    <div class="room-code" id="share-code" onclick="copyCode()">--- ---</div>
+    <p style="margin-top:12px;font-size:10px">WAITING<span class="dots"></span></p>
+  </div>
+</div>
+
+<!-- GAME OVER -->
+<div id="go-banner">
+  <div id="go-title">GAME OVER</div>
+  <div id="go-msg"></div>
+  <button class="btn" onclick="resetToLobby()" style="width:auto;padding:10px 28px;margin-top:4px">[ NEW GAME ]</button>
+</div>
+
+<!-- PROMO -->
+<div id="promo"><div id="promo-inner"></div></div>
+
 <script type="module">
-// ─── REPLACE THIS WITH YOUR FIREBASE CONFIG ───────────────────
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getDatabase, ref, set, get, update, onValue, off, onDisconnect, serverTimestamp, push }
-  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { initializeApp }                                                            from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInAnonymously, onAuthStateChanged }                          from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import { getDatabase, ref, set, get, update, onValue, off, push, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
-const firebaseConfig = {
-  apiKey: "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
-  authDomain: "chess-board-5085f.firebaseapp.com",
-  databaseURL: "https://chess-board-5085f-default-rtdb.firebaseio.com",
-  projectId: "chess-board-5085f",
-  storageBucket: "chess-board-5085f.firebasestorage.app",
+// ── Firebase ──────────────────────────────────────────────────────────────────
+const app  = initializeApp({
+  apiKey:            "AIzaSyDHX7BLo3HheGXQP4qWTKpkdohRYi8jxzM",
+  authDomain:        "chess-board-5085f.firebaseapp.com",
+  databaseURL:       "https://chess-board-5085f-default-rtdb.firebaseio.com",
+  projectId:         "chess-board-5085f",
+  storageBucket:     "chess-board-5085f.firebasestorage.app",
   messagingSenderId: "838244800546",
-  appId: "1:838244800546:web:5520be1581f94067c1927b",
-};
-// ──────────────────────────────────────────────────────────────
-
-const app = initializeApp(firebaseConfig);
+  appId:             "1:838244800546:web:5520be1581f94067c1927b"
+});
 const auth = getAuth(app);
 const db   = getDatabase(app);
 
-// ─── State ────────────────────────────────────────────────────
-let uid = null, myColor = null, roomId = null, gameRef = null;
-let flipped = false;
-let gameEnded = false;
+// ── Game state ────────────────────────────────────────────────────────────────
+let uid = null, myColor = null, roomId = null, gameRef = null, gameListener = null;
 let board = [], selected = null, validMoves = [], turn = 'white';
-let capturedByWhite = [], capturedByBlack = [], moveLog = [];
-let gameActive = false, lastFrom = null, lastTo = null;
-let waitDotsInterval = null;
-let pendingPromotion = null;
+let flipped = false, gameActive = false, gameEnded = false;
+let lastFrom = null, lastTo = null;
+let moveLog = [], capturedByWhite = [], capturedByBlack = [];
+let pendingPromo = null;
+let chatRef = null, chatOff = null;
 
-// ─── Board init ──────────────────────────────────────────────
+// ── Piece SVGs ────────────────────────────────────────────────────────────────
+function makeSVG(inner, F, S) {
+  return `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
+<g fill="${F}" stroke="${S}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+${inner}
+</g></svg>`;
+}
+
+function getPieceSVG(p) {
+  if (!p) return '';
+  const isW = p[0] === 'w';
+  const F = isW ? '#ffffff' : '#202020';
+  const S = isW ? 'rgba(0,0,0,0.45)' : '#888888';
+  const t = p[1];
+
+  if (t === 'P') return makeSVG(`
+    <circle cx="22.5" cy="10" r="5"/>
+    <path d="M20 19h5l2 9h-9z"/>
+    <path d="M14.5 36h16v-3l-2.5-5.5h-11l-2.5 5.5z"/>`, F, S);
+
+  if (t === 'R') return makeSVG(`
+    <path d="M9 39h27v-3H9z"/>
+    <path d="M12 36v-4h21v4z"/>
+    <path d="M11 14V9h4v2h5V9h5v2h5V9h4v5"/>
+    <path d="M34 14l-3 3H14l-3-3"/>
+    <path d="M31 17v12.5H14V17"/>
+    <path d="M31 29.5l1.5 2.5h-19l1.5-2.5"/>`, F, S);
+
+  if (t === 'Q') return makeSVG(`
+    <circle cx="6"    cy="12"  r="2.6"/>
+    <circle cx="14"   cy="9"   r="2.6"/>
+    <circle cx="22.5" cy="8"   r="2.6"/>
+    <circle cx="31"   cy="9"   r="2.6"/>
+    <circle cx="39"   cy="12"  r="2.6"/>
+    <path d="M9 26c8.5-8.5 15.5-8.5 27 0l2.5-12.5L31 25l-.3-14.1-8.2 13.4-8.2-13.4L14 25 6.5 13.5z"/>
+    <path d="M9 26c0 2 1.5 2 2.5 4 1 1.5 1 1 .5 3.5-1.5 1-1 2.5-1 2.5-1.5 1.5 0 2.5 0 2.5 6.5 1 16.5 1 23 0 0 0 1.5-1 0-2.5 0 0 .5-1.5-1-2.5-.5-2.5-.5-2 .5-3.5 1-2 2.5-2 2.5-4" fill="none"/>
+    <path d="M11.5 30c3.5-1 18.5-1 22 0M12 33.5c4-1.5 17-1.5 21 0" fill="none"/>`, F, S);
+
+  if (t === 'B') return makeSVG(`
+    <circle cx="22.5" cy="6" r="2.5"/>
+    <path d="M21 6h3M22.5 4v4" stroke-width="1.3"/>
+    <path d="M22.5 8.5C22.5 8.5 12 18 12 26c0 5 5 7 10.5 7S33 31 33 26c0-8-10.5-17.5-10.5-17.5z"/>
+    <path d="M12 26c0 2 1 4 3 5.5M33 26c0 2-1 4-3 5.5" fill="none"/>
+    <path d="M20 33c-1 1-2 2-2 3h9c0-1-1-2-2-3"/>
+    <rect x="13" y="36" width="19" height="3"   rx="1.5"/>
+    <rect x="10" y="39" width="25" height="2.5" rx="2"/>`, F, S);
+
+  if (t === 'N') return makeSVG(`
+    <rect x="10"  y="36"   width="25" height="3.5"  rx="2"/>
+    <rect x="12"  y="32.5" width="21" height="3.5"  rx="1.5"/>
+    <path d="M30 32.5
+      C30 26 33 22 33 17
+      C33 11 29 7 24 6
+      C22 5.5 20 5.5 19 6.5
+      C17 4.5 15 3.5 15 3.5
+      C14 5.5 15 7.5 16 8.5
+      C13 10.5 11 13.5 11 17.5
+      C11 21.5 13 25.5 13 28.5
+      C11 29.5 10 31 10 32.5 L30 32.5 Z"/>
+    <path d="M16 8.5C14 10.5 12 13.5 12 17.5" fill="none" stroke-width="1"/>
+    <path d="M15 4C15.5 2.5 17 2 19 3" fill="none" stroke-width="1"/>
+    <circle cx="22" cy="11" r="2.5" fill="${S}" stroke="none"/>
+    <path d="M11 22C13 20 17 19 20 20" fill="none" stroke-width="1"/>
+    <path d="M10 28C12 26.5 15 26.5 17 27.5" fill="none" stroke-width="1"/>`, F, S);
+
+  if (t === 'K') return makeSVG(`
+    <path d="M22.5 1L22.5 9" stroke-width="2.5"/>
+    <path d="M18 5L27 5" stroke-width="2.5"/>
+    <circle cx="22.5" cy="12" r="4.5"/>
+    <path d="M7 30L38 30L36 22C34 16 29 12 22.5 12C16 12 11 16 9 22Z"/>
+    <path d="M9 22C11 16 16 12 22.5 12C29 12 34 16 36 22" fill="none"/>
+    <path d="M7 30L7 34L38 34L38 30Z"/>
+    <path d="M8 34L8 38L37 38L37 34Z"/>
+    <path d="M9 27L36 27M8 32L37 32" fill="none"/>`, F, S);
+
+  return '';
+}
+
+// ── Board init ────────────────────────────────────────────────────────────────
 function initBoard() {
   const b = Array(8).fill(null).map(() => Array(8).fill(null));
   const back = ['R','N','B','Q','K','B','N','R'];
@@ -849,834 +333,655 @@ function initBoard() {
   return b;
 }
 
-// ─── Pieces ──────────────────────────────────────────────────
-// SVG paths for each piece type (viewBox 0 0 45 45)
-const PIECE_SVG = {
-  // KING
-  K: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
-    <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M22.5 1 L22.5 8" stroke-width="2"/>
-      <path d="M18 5 L27 5" stroke-width="2"/>
-      <circle cx="22.5" cy="11" r="4"/>
-      <path d="M8 31 L37 31 L35 23 C33 17 29 13 22.5 13 C16 13 12 17 10 23 Z"/>
-      <path d="M10 23 C12 17 16 13 22.5 13 C29 13 33 17 35 23" fill="none"/>
-      <path d="M8 31 L8 35 L37 35 L37 31"/>
-      <path d="M9 35 L9 39 L36 39 L36 35"/>
-      <path d="M10 27.5 L35 27.5" fill="none"/>
-      <path d="M9 33 L36 33" fill="none"/>
-    </g></svg>`,
-  // QUEEN
-  Q: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
-    <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="8"    cy="13" r="3"/>
-      <circle cx="16"   cy="8"  r="3"/>
-      <circle cx="22.5" cy="6"  r="3"/>
-      <circle cx="29"   cy="8"  r="3"/>
-      <circle cx="37"   cy="13" r="3"/>
-      <path d="M8 13 L11 28 L34 28 L37 13 L29 21 L22.5 9 L16 21 Z"/>
-      <path d="M11 28 C11 30 12 31 13 32 L32 32 C33 31 34 30 34 28"/>
-      <rect x="11" y="32" width="23" height="3.5" rx="1.5"/>
-      <rect x="9"  y="35.5" width="27" height="4" rx="2"/>
-    </g></svg>`,
-  // ROOK
-  R: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
-    <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="10" y="8"  width="6"  height="8" rx="1"/>
-      <rect x="19.5" y="8" width="6" height="8" rx="1"/>
-      <rect x="29" y="8"  width="6"  height="8" rx="1"/>
-      <path d="M12 16 L12 30 C12 31 13 32 14 32 L31 32 C32 32 33 31 33 30 L33 16 Z"/>
-      <path d="M12 24 L33 24"/>
-      <rect x="9"  y="32" width="27" height="3.5" rx="1.5"/>
-      <rect x="7"  y="35.5" width="31" height="4" rx="2"/>
-    </g></svg>`,
-  // BISHOP  
-  B: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
-    <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="22.5" cy="6" r="2.5"/>
-      <path d="M20.5 6 L24.5 6 M22.5 4 L22.5 8" stroke-width="1.3"/>
-      <path d="M22.5 8.5 C22.5 8.5 12 18 12 26 C12 31 17 33 22.5 33 C28 33 33 31 33 26 C33 18 22.5 8.5 22.5 8.5 Z"/>
-      <path d="M12 26 C12 28 13 30 15 31.5" fill="none"/>
-      <path d="M33 26 C33 28 32 30 30 31.5" fill="none"/>
-      <path d="M20 33 C19 34 18 35 18 36 L27 36 C27 35 26 34 25 33"/>
-      <rect x="13" y="36" width="19" height="3" rx="1.5"/>
-      <rect x="10" y="39" width="25" height="3" rx="2"/>
-    </g></svg>`,
-  // KNIGHT
-  N: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
-    <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <rect x="10" y="35.5" width="25" height="4" rx="2"/>
-      <rect x="12" y="32"   width="21" height="3.5" rx="1.5"/>
-      <path d="M30 32
-        C30 26 33 22 33 18
-        C33 12 29 8 25 7
-        C23 6 21 6 20 7
-        C18 5 16 4 16 4
-        C15 6 16 8 17 9
-        C14 11 12 14 12 18
-        C12 22 14 26 14 29
-        C12 30 11 31 11 32
-        L30 32 Z"/>
-      <path d="M17 9 C15 11 13 14 13 18" fill="none" stroke-width="1"/>
-      <path d="M14 6 C15 4 17 3 19 4" fill="none" stroke-width="1"/>
-      <circle cx="22" cy="11" r="2.5" fill="STROKE" stroke="none"/>
-      <path d="M12 23 C14 21 18 20 21 21" fill="none" stroke-width="1"/>
-      <path d="M11 29 C13 27 16 27 18 28" fill="none" stroke-width="1"/>
-    </g></svg>`,
-  // PAWN
-  P: `<svg viewBox="0 0 45 45" xmlns="http://www.w3.org/2000/svg">
-    <g fill="FILL" stroke="STROKE" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="22.5" cy="10" r="5.5"/>
-      <path d="M17.5 16 C15 19 14 22 16 25 C14 25 12 26 12 28 L33 28 C33 26 31 25 29 25 C31 22 30 19 27.5 16 Z"/>
-      <rect x="10" y="28" width="25" height="3.5" rx="1.5"/>
-      <rect x="8"  y="31.5" width="29" height="4" rx="2"/>
-    </g></svg>`,
-};
-
-function getPieceSVG(p) {
-  if (!p) return '';
-  const type  = p[1];
-  const color = p[0];
-  const fill   = color === 'w' ? '#ffffff' : '#1a1a1a';
-  const stroke = color === 'w' ? 'rgba(0,0,0,0.35)' : '#888888';
-  return PIECE_SVG[type]
-    .replace(/FILL/g, fill)
-    .replace(/STROKE/g, stroke);
-}
-
-function buildBoardUI() {
-  const boardEl = document.getElementById('board');
-  boardEl.innerHTML = '';
-  updateCoords();
+// Build DOM board squares — called ONCE on page load
+function buildBoard() {
+  const el = document.getElementById('board');
+  const arrowSvg = document.getElementById('arrow-svg');
+  el.innerHTML = '';
+  el.appendChild(arrowSvg);
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
       const sq = document.createElement('div');
       sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
-      sq.dataset.r = r; sq.dataset.c = c;
+      sq.dataset.r = r;
+      sq.dataset.c = c;
       sq.addEventListener('click', () => onSquareClick(r, c));
-      sq.addEventListener('touchend', (e) => { e.preventDefault(); onSquareClick(r, c); });
-      boardEl.appendChild(sq);
+      sq.addEventListener('touchend', e => { e.preventDefault(); onSquareClick(r, c); });
+      el.appendChild(sq);
     }
   }
-}
-
-function updateCoords() {
-  const cols = document.getElementById('coord-cols');
-  const rows = document.getElementById('coord-rows');
-  if (!cols || !rows) return;
-  cols.innerHTML = '';
-  rows.innerHTML = '';
-  const files = flipped ? ['h','g','f','e','d','c','b','a'] : ['a','b','c','d','e','f','g','h'];
-  const ranks = flipped ? ['1','2','3','4','5','6','7','8'] : ['8','7','6','5','4','3','2','1'];
-  files.forEach(f => { const s=document.createElement('span');s.textContent=f;cols.appendChild(s); });
-  ranks.forEach(r => { const s=document.createElement('span');s.textContent=r;rows.appendChild(s); });
-}
-
-function applyBoardFlip() {
-  const boardEl = document.getElementById('board');
-  boardEl.style.transform = flipped ? 'rotate(180deg)' : '';
-  document.querySelectorAll('#board .piece').forEach(p => {
-    p.style.transform = flipped ? 'rotate(180deg)' : '';
-  });
   updateCoords();
 }
 
-function drawMoveArrow() {
-  const overlay = document.getElementById('arrow-overlay');
-  if (!overlay) return;
-  overlay.innerHTML = '';
-  if (!lastFrom || !lastTo) return;
-
-  const boardEl = document.getElementById('board');
-  const sqSize = boardEl.offsetWidth / 8;
-
-  function toVisual(r, c) {
-    const vr = flipped ? 7 - r : r;
-    const vc = flipped ? 7 - c : c;
-    return { x: vc * sqSize + sqSize / 2, y: vr * sqSize + sqSize / 2 };
-  }
-
-  const from = toVisual(lastFrom[0], lastFrom[1]);
-  const to   = toVisual(lastTo[0],   lastTo[1]);
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  const len = Math.sqrt(dx*dx + dy*dy);
-  if (len < 1) return;
-  const ux = dx/len, uy = dy/len;
-  const arrowHeadLen = sqSize * 0.38;
-  const shaftEnd = { x: to.x - ux * arrowHeadLen * 0.6, y: to.y - uy * arrowHeadLen * 0.6 };
-  const px = -uy, py = ux;
-  const hw = arrowHeadLen * 0.38;
-
-  const arrowPath = [
-    `M ${from.x + px*hw*0.5} ${from.y + py*hw*0.5}`,
-    `L ${shaftEnd.x + px*hw*0.5} ${shaftEnd.y + py*hw*0.5}`,
-    `L ${shaftEnd.x + px*hw} ${shaftEnd.y + py*hw}`,
-    `L ${to.x} ${to.y}`,
-    `L ${shaftEnd.x - px*hw} ${shaftEnd.y - py*hw}`,
-    `L ${shaftEnd.x - px*hw*0.5} ${shaftEnd.y - py*hw*0.5}`,
-    `L ${from.x - px*hw*0.5} ${from.y - py*hw*0.5}`,
-    'Z'
-  ].join(' ');
-
-  const path = document.createElementNS('http://www.w3.org/2000/svg','path');
-  path.setAttribute('d', arrowPath);
-  path.setAttribute('fill', 'rgba(0,255,136,0.03)');
-  path.setAttribute('stroke', 'rgba(0,255,136,0.08)');
-  path.setAttribute('stroke-width', '1');
-  path.setAttribute('stroke-linejoin', 'round');
-  overlay.appendChild(path);
+function updateCoords() {
+  const files = 'abcdefgh';
+  const ranks = '87654321';
+  const colEl = document.getElementById('coord-cols');
+  const rowEl = document.getElementById('coord-rows');
+  if (!colEl || !rowEl) return;
+  const f = flipped ? [...files].reverse() : [...files];
+  const r = flipped ? [...ranks].reverse() : [...ranks];
+  colEl.innerHTML = f.map(x => `<span>${x}</span>`).join('');
+  rowEl.innerHTML = r.map(x => `<span>${x}</span>`).join('');
 }
 
+function getSq(r, c) {
+  return document.querySelector(`#board .sq[data-r="${r}"][data-c="${c}"]`);
+}
 
 function renderBoard() {
   for (let r = 0; r < 8; r++) {
     for (let c = 0; c < 8; c++) {
-      const sq = getSquareEl(r,c);
+      const sq = getSq(r, c);
       if (!sq) continue;
       sq.className = 'sq ' + ((r+c)%2===0 ? 'light' : 'dark');
-      if (lastFrom && lastFrom[0]===r && lastFrom[1]===c) sq.classList.add('last-move');
-      if (lastTo   && lastTo[0]===r   && lastTo[1]===c)   sq.classList.add('last-move');
-      sq.innerHTML = '';
+      if (lastFrom && lastFrom[0]===r && lastFrom[1]===c) sq.classList.add('lm');
+      if (lastTo   && lastTo[0]  ===r && lastTo[1]  ===c) sq.classList.add('lm');
       const p = board[r][c];
-      if (p) {
-        const wrap = document.createElement('div');
-        wrap.className = 'piece piece-' + p[0];
-        wrap.innerHTML = getPieceSVG(p);
-        sq.appendChild(wrap);
-      }
+      sq.innerHTML = p ? `<div class="piece">${getPieceSVG(p)}</div>` : '';
     }
   }
-  // Highlight selected & valid moves
+
+  // Selected + valid moves
   if (selected) {
-    getSquareEl(...selected)?.classList.add('selected');
-    validMoves.forEach(([mr,mc]) => {
-      const el = getSquareEl(mr,mc);
-      if (!el) return;
-      el.classList.add(board[mr][mc] ? 'valid-capture' : 'valid-move');
+    getSq(...selected)?.classList.add('sel');
+    validMoves.forEach(([mr, mc]) => {
+      const sq = getSq(mr, mc);
+      if (!sq) return;
+      sq.classList.add(board[mr][mc] ? 'vc' : 'vm');
     });
   }
+
   // Check highlight
-  const kingPos = findKing(turn[0]);
-  if (kingPos && isInCheck(board, turn[0])) {
-    getSquareEl(...kingPos)?.classList.add('in-check');
-  }
-  // Apply board flip for black player (pieces need counter-rotation)
-  applyBoardFlip();
-  // Draw last-move arrow
-  drawMoveArrow();
-}
-
-function getSquareEl(r,c) {
-  return document.querySelector(`#board .sq[data-r="${r}"][data-c="${c}"]`);
-}
-
-// ─── Chess logic ─────────────────────────────────────────────
-function onSquareClick(r, c) {
-  console.log('[CLICK]', r, c, '| gameActive:', gameActive, '| myColor:', myColor, '| turn:', turn, '| piece:', board[r] && board[r][c]);
-  if (!gameActive) { console.log('[BLOCKED] gameActive is false'); return; }
-  if (myColor !== turn) { console.log('[BLOCKED] not your turn - myColor:', myColor, 'turn:', turn); return; }
-
-  const clicked = board[r][c];
-
-  // If we have a piece selected, try to move it
-  if (selected) {
-    const move = validMoves.find(([mr,mc]) => mr===r && mc===c);
-    if (move) {
-      doMove(selected[0], selected[1], r, c);
-      selected = null; validMoves = [];
-      renderBoard();
-      return;
-    }
-    // Clicked a different friendly piece — re-select it
-    if (clicked && pieceColor(clicked) === myColor[0]) {
-      selected = [r,c];
-      validMoves = getLegalMoves(board, r, c, myColor[0]);
-      renderBoard();
-      return;
-    }
-    // Clicked empty or enemy with no move — deselect
-    selected = null; validMoves = [];
-    renderBoard();
-    return;
-  }
-
-  // No piece selected yet — select a friendly piece
-  if (clicked && pieceColor(clicked) === myColor[0]) {
-    selected = [r,c];
-    validMoves = getLegalMoves(board, r, c, myColor[0]);
-    console.log('[SELECTED]', clicked, 'at', r, c, '| validMoves:', validMoves.length);
-  } else {
-    console.log('[NO SELECT] clicked:', clicked, '| myColor[0]:', myColor ? myColor[0] : 'null');
-  }
-  renderBoard();
-}
-
-function doMove(fr, fc, tr, tc, promoChoice) {
-  const piece = board[fr][fc];
-  const target = board[tr][tc];
-  const newBoard = board.map(row => [...row]);
-
-  // En passant
-  let enPassantCapture = null;
-  if (pieceType(piece)==='P' && fc!==tc && !target) {
-    newBoard[fr][tc] = null;
-    enPassantCapture = newBoard[fr][tc];
-  }
-
-  if (target) {
-    if (pieceColor(piece)==='w') capturedByWhite.push(target);
-    else capturedByBlack.push(target);
-  }
-
-  // Castling
-  if (pieceType(piece)==='K' && Math.abs(fc-tc)===2) {
-    if (tc===6) { newBoard[fr][7]=null; newBoard[fr][5]= pieceColor(piece)+'R'; }
-    else        { newBoard[fr][0]=null; newBoard[fr][3]= pieceColor(piece)+'R'; }
-  }
-
-  newBoard[tr][tc] = piece;
-  newBoard[fr][fc] = null;
-
-  // Promotion
-  if (pieceType(piece)==='P' && (tr===0 || tr===7)) {
-    if (!promoChoice) {
-      // Store the fully-built newBoard (pawn already moved to tr,tc)
-      // so when player picks a piece we just swap that square
-      pendingPromotion = {newBoard, fr, fc, tr, tc, piece};
-      board = newBoard; // preview move
-      renderBoard();
-      showPromoModal(pieceColor(piece));
-      return;
-    }
-    newBoard[tr][tc] = pieceColor(piece) + promoChoice;
-  }
-
-  board = newBoard;
-  lastFrom = [fr,fc]; lastTo = [tr,tc];
-
-  const nextTurn = turn === 'white' ? 'black' : 'white';
-  const notation = toAlgebraic(piece, fr, fc, tr, tc, target, promoChoice);
-  moveLog.push(notation);
-
-  // Push to Firebase
-  update(gameRef, {
-    board: JSON.stringify(board),
-    turn: nextTurn,
-    capturedByWhite: JSON.stringify(capturedByWhite),
-    capturedByBlack: JSON.stringify(capturedByBlack),
-    moveLog: JSON.stringify(moveLog),
-    lastFrom: JSON.stringify([fr,fc]),
-    lastTo:   JSON.stringify([tr,tc]),
+  ['white','black'].forEach(col => {
+    const k = findKing(board, col[0]);
+    if (k && isInCheck(board, col[0])) getSq(...k)?.classList.add('chk');
   });
-}
 
-function showPromoModal(color) {
-  const modal = document.getElementById('promo-modal');
-  const choices = document.getElementById('promo-choices');
-  choices.innerHTML = '';
-  modal.classList.remove('hidden');
-  ['Q','R','B','N'].forEach(t => {
-    const btn = document.createElement('button');
-    btn.className = 'promo-btn';
-    btn.innerHTML = getPieceSVG(color+t);
-    btn.onclick = () => {
-      modal.classList.add('hidden');
-      const {newBoard: nb, fr, fc, tr, tc, piece} = pendingPromotion;
-      pendingPromotion = null;
-      // Apply promotion directly to the stored board state
-      nb[tr][tc] = pieceColor(piece) + t;
-      board = nb;
-      lastFrom = [fr,fc]; lastTo = [tr,tc];
-      const nextTurn = turn === 'white' ? 'black' : 'white';
-      const notation = pieceColor(piece) + t + '=' + t;
-      moveLog.push(notation);
-      capturedByWhite; // already updated before modal
-      update(gameRef, {
-        board: JSON.stringify(board),
-        turn: nextTurn,
-        capturedByWhite: JSON.stringify(capturedByWhite),
-        capturedByBlack: JSON.stringify(capturedByBlack),
-        moveLog: JSON.stringify(moveLog),
-        lastFrom: JSON.stringify([fr,fc]),
-        lastTo:   JSON.stringify([tr,tc]),
-      });
-    };
-    choices.appendChild(btn);
+  // Flip pieces for black
+  document.querySelectorAll('#board .piece').forEach(p => {
+    p.style.transform = flipped ? 'rotate(180deg)' : '';
   });
+
+  drawArrow();
 }
 
-function toAlgebraic(piece, fr, fc, tr, tc, cap, promo) {
-  const files = 'abcdefgh';
-  const type = pieceType(piece);
-  let s = type === 'P' ? '' : type;
-  if (type==='P' && cap) s += files[fc] + 'x';
-  else if (cap) s += 'x';
-  s += files[tc] + (8-tr);
-  if (promo) s += '=' + promo;
-  return s;
+function drawArrow() {
+  const svgEl = document.getElementById('arrow-svg');
+  svgEl.innerHTML = '';
+  if (!lastFrom || !lastTo) return;
+  const boardEl = document.getElementById('board');
+  const sz = boardEl.clientWidth / 8;
+  const vis = (r, c) => ({
+    x: (flipped ? 7-c : c) * sz + sz/2,
+    y: (flipped ? 7-r : r) * sz + sz/2
+  });
+  const F = vis(lastFrom[0], lastFrom[1]);
+  const T = vis(lastTo[0],   lastTo[1]);
+  const dx = T.x-F.x, dy = T.y-F.y;
+  const len = Math.sqrt(dx*dx + dy*dy);
+  if (len < 2) return;
+  const ux = dx/len, uy = dy/len, px = -uy, py = ux;
+  const hw = sz*0.12, hl = sz*0.30;
+  const bx = T.x - ux*hl, by = T.y - uy*hl;
+  const d = [
+    `M${F.x+px*hw} ${F.y+py*hw}`,
+    `L${bx+px*hw} ${by+py*hw}`,
+    `L${bx+px*hw*2.2} ${by+py*hw*2.2}`,
+    `L${T.x} ${T.y}`,
+    `L${bx-px*hw*2.2} ${by-py*hw*2.2}`,
+    `L${bx-px*hw} ${by-py*hw}`,
+    `L${F.x-px*hw} ${F.y-py*hw}Z`
+  ].join(' ');
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', 'rgba(0,255,136,0.1)');
+  path.setAttribute('stroke', 'rgba(0,255,136,0.22)');
+  path.setAttribute('stroke-width', '1');
+  svgEl.appendChild(path);
 }
 
-// ─── Move generation ─────────────────────────────────────────
-function cloneBoard(b) { return b.map(row => [...row]); }
+// ── Chess logic ───────────────────────────────────────────────────────────────
+const pc  = p => p ? p[0] : null;  // piece color char: 'w' or 'b'
+const pt  = p => p ? p[1] : null;  // piece type char: K Q R B N P
+const opp = c => c === 'w' ? 'b' : 'w';
 
-// skipCastling flag prevents infinite recursion:
-// getRawMoves (King) -> isInCheck -> getRawMoves -> isInCheck ...
-function getRawMoves(b, r, c, color, skipCastling) {
+function getRawMoves(b, r, c, skipCastle = false) {
   const p = b[r][c];
-  if (!p || pieceColor(p) !== color) return [];
-  const type = pieceType(p);
-  const moves = [];
-  const inBounds = (rr, cc) => rr >= 0 && rr < 8 && cc >= 0 && cc < 8;
-  const friendly = (rr, cc) => inBounds(rr,cc) && pieceColor(b[rr][cc]) === color;
-  const enemy    = (rr, cc) => inBounds(rr,cc) && b[rr][cc] && pieceColor(b[rr][cc]) !== color;
-  const empty    = (rr, cc) => inBounds(rr,cc) && !b[rr][cc];
-
-  const slide = (dirs) => {
-    dirs.forEach(([dr,dc]) => {
-      let nr = r+dr, nc = c+dc;
-      while (inBounds(nr,nc)) {
-        if (friendly(nr,nc)) break;
-        moves.push([nr,nc]);
-        if (b[nr][nc]) break;
-        nr += dr; nc += dc;
-      }
-    });
-  };
-  const jump = (dirs) => {
-    dirs.forEach(([dr,dc]) => {
-      const nr=r+dr, nc=c+dc;
-      if (inBounds(nr,nc) && !friendly(nr,nc)) moves.push([nr,nc]);
-    });
-  };
-
-  if (type==='R') slide([[1,0],[-1,0],[0,1],[0,-1]]);
-  if (type==='B') slide([[1,1],[1,-1],[-1,1],[-1,-1]]);
-  if (type==='Q') slide([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
-  if (type==='N') jump([[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]);
-  if (type==='K') {
-    jump([[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]);
-    // Castling — skipped when called from isInCheck to prevent infinite recursion
-    if (!skipCastling && !isInCheck(b, color)) {
-      if (color==='w' && r===7 && c===4) {
-        if (b[7][7]==='wR' && !b[7][5] && !b[7][6]) moves.push([7,6]);
-        if (b[7][0]==='wR' && !b[7][1] && !b[7][2] && !b[7][3]) moves.push([7,2]);
-      }
-      if (color==='b' && r===0 && c===4) {
-        if (b[0][7]==='bR' && !b[0][5] && !b[0][6]) moves.push([0,6]);
-        if (b[0][0]==='bR' && !b[0][1] && !b[0][2] && !b[0][3]) moves.push([0,2]);
-      }
+  if (!p) return [];
+  const col = pc(p), type = pt(p), moves = [];
+  const inBounds = (nr, nc) => nr >= 0 && nr < 8 && nc >= 0 && nc < 8;
+  const add = (nr, nc) => { if (inBounds(nr, nc) && pc(b[nr][nc]) !== col) moves.push([nr, nc]); };
+  const slide = (dr, dc) => {
+    let nr = r+dr, nc = c+dc;
+    while (inBounds(nr, nc)) {
+      moves.push([nr, nc]);
+      if (b[nr][nc]) break;
+      nr += dr; nc += dc;
     }
-  }
-  if (type==='P') {
-    const dir   = color==='w' ? -1 : 1;
-    const start = color==='w' ? 6   : 1;
-    if (empty(r+dir, c)) {
+    // remove last if same color
+  };
+
+  if (type === 'P') {
+    const dir = col === 'w' ? -1 : 1;
+    const startRow = col === 'w' ? 6 : 1;
+    if (inBounds(r+dir, c) && !b[r+dir][c]) {
       moves.push([r+dir, c]);
-      if (r === start && empty(r+2*dir, c)) {
-        moves.push([r+2*dir, c]);
-      }
+      if (r === startRow && !b[r+2*dir][c]) moves.push([r+2*dir, c]);
     }
     [-1, 1].forEach(dc => {
-      if (enemy(r+dir, c+dc)) moves.push([r+dir, c+dc]);
+      if (inBounds(r+dir, c+dc) && b[r+dir][c+dc] && pc(b[r+dir][c+dc]) !== col)
+        moves.push([r+dir, c+dc]);
     });
+    return moves;
   }
+
+  if (type === 'N') {
+    [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(([dr,dc]) => add(r+dr, c+dc));
+    return moves;
+  }
+
+  if (type === 'B' || type === 'Q') [[-1,-1],[-1,1],[1,-1],[1,1]].forEach(([dr,dc]) => slide(dr, dc));
+  if (type === 'R' || type === 'Q') [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr,dc]) => slide(dr, dc));
+
+  // Remove same-color destinations from slides
+  if (type === 'B' || type === 'R' || type === 'Q')
+    return moves.filter(([nr,nc]) => pc(b[nr][nc]) !== col);
+
+  if (type === 'K') {
+    [[-1,-1],[-1,0],[-1,1],[0,-1],[0,1],[1,-1],[1,0],[1,1]].forEach(([dr,dc]) => add(r+dr, c+dc));
+    if (!skipCastle && !isInCheck(b, col)) {
+      const row = col === 'w' ? 7 : 0;
+      if (r === row && c === 4) {
+        if (b[row][7] === col+'R' && !b[row][5] && !b[row][6] &&
+            !isSquareAttacked(b,row,5,col) && !isSquareAttacked(b,row,6,col))
+          moves.push([row, 6]);
+        if (b[row][0] === col+'R' && !b[row][1] && !b[row][2] && !b[row][3] &&
+            !isSquareAttacked(b,row,3,col))
+          moves.push([row, 2]);
+      }
+    }
+    return moves;
+  }
+
   return moves;
 }
 
-function isInCheck(b, color) {
-  const king = findKingIn(b, color);
-  if (!king) return false;
-  const ocolor = opp(color);
-  for (let r=0; r<8; r++) {
-    for (let c=0; c<8; c++) {
-      if (pieceColor(b[r][c]) === ocolor) {
-        // Pass skipCastling=true to avoid infinite recursion
-        const attacks = getRawMoves(b, r, c, ocolor, true);
-        if (attacks.some(([tr,tc]) => tr===king[0] && tc===king[1])) return true;
+function isSquareAttacked(b, r, c, byWhoseKingColor) {
+  // Is square (r,c) attacked by opponent of byWhoseKingColor?
+  const attacker = opp(byWhoseKingColor);
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 8; j++) {
+      if (pc(b[i][j]) === attacker) {
+        if (getRawMoves(b, i, j, true).some(([nr,nc]) => nr===r && nc===c)) return true;
       }
     }
   }
   return false;
 }
 
-function getLegalMoves(b, r, c, color) {
-  const raw = getRawMoves(b, r, c, color, false);
-  return raw.filter(([tr, tc]) => {
-    const next = cloneBoard(b);
-    const piece = next[r][c];
-    if (pieceType(piece) === 'K' && Math.abs(tc - c) === 2) {
-      if (tc === 6) { next[r][7] = null; next[r][5] = color + 'R'; }
-      else          { next[r][0] = null; next[r][3] = color + 'R'; }
-    }
-    next[tr][tc] = next[r][c];
-    next[r][c] = null;
-    return !isInCheck(next, color);
-  });
+function isInCheck(b, col) {
+  const k = findKing(b, col);
+  return k ? isSquareAttacked(b, k[0], k[1], col) : false;
 }
 
-
-
-function findKingIn(b, color) {
-  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
-    if(b[r][c]===color+'K') return [r,c];
+function findKing(b, col) {
+  // col can be 'w', 'b', 'white', 'black'
+  const c = col.length > 1 ? col[0] : col;
+  for (let r = 0; r < 8; r++)
+    for (let cc = 0; cc < 8; cc++)
+      if (b[r][cc] === c + 'K') return [r, cc];
   return null;
 }
-function findKing(color) { return findKingIn(board, color); }
 
-function hasLegalMoves(color) {
-  for(let r=0;r<8;r++) for(let c=0;c<8;c++)
-    if(pieceColor(board[r][c])===color[0])
-      if(getLegalMoves(board,r,c,color[0]).length>0) return true;
+function getLegalMoves(b, r, c) {
+  const col = pc(b[r][c]);
+  if (!col) return [];
+  return getRawMoves(b, r, c).filter(([nr, nc]) => {
+    const nb = b.map(row => [...row]);
+    nb[nr][nc] = b[r][c];
+    nb[r][c] = null;
+    // Move rook for castling
+    if (pt(b[r][c]) === 'K' && Math.abs(nc - c) === 2) {
+      const row = r, ks = nc === 6;
+      nb[row][ks ? 5 : 3] = nb[row][ks ? 7 : 0];
+      nb[row][ks ? 7 : 0] = null;
+    }
+    return !isInCheck(nb, col);
+  });
+}
+
+function hasAnyLegalMove(col) {
+  const c = col.length > 1 ? col[0] : col;
+  for (let r = 0; r < 8; r++)
+    for (let cc = 0; cc < 8; cc++)
+      if (pc(board[r][cc]) === c && getLegalMoves(board, r, cc).length > 0) return true;
   return false;
 }
 
-function checkGameEnd() {
-  const c = turn[0];
-  const legalMovesExist = hasLegalMoves(turn);
-  const inCheck = isInCheck(board, c);
-  if (!legalMovesExist) {
-    if (inCheck) endGame(turn==='white' ? 'BLACK WINS' : 'WHITE WINS', 'Checkmate!');
-    else         endGame('DRAW', 'Stalemate — no legal moves.');
-  }
-}
+// ── Square click ──────────────────────────────────────────────────────────────
+function onSquareClick(r, c) {
+  if (!gameActive) return;
+  if (myColor !== turn) return;
 
-function endGame(title, msg) {
-  gameActive = false;
-  gameEnded  = true;
-  document.getElementById('gameover-title').textContent = title;
-  document.getElementById('gameover-msg').textContent   = msg;
-  const banner = document.getElementById('gameover-banner');
-  if (banner) banner.style.display = 'flex';
-}
-
-function writeGameOver() {
-  if (gameRef) {
-    update(gameRef, { status: 'complete' });
-    setTimeout(() => {
-      if (roomId) set(ref(db, 'chat/' + roomId), null);
-    }, 30000);
-  }
-
-}
-
-// ─── UI helpers ──────────────────────────────────────────────
-function updateStatus(msg) {
-  const bar = document.getElementById('status-bar');
-  bar.textContent = msg;
-  bar.style.animation = 'none';
-  bar.offsetHeight;
-  bar.style.animation = 'statusPulse 1s ease-in-out';
-}
-
-function updateSidePanels() {
-  const wCard = document.getElementById('card-white');
-  const bCard = document.getElementById('card-black');
-  wCard.classList.toggle('active-turn', turn === 'white');
-  bCard.classList.toggle('active-turn', turn === 'black');
-  document.getElementById('name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
-  document.getElementById('name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
-  const mw = document.getElementById('mobile-white');
-  const mb = document.getElementById('mobile-black');
-  if (mw) {
-    mw.className = 'mobile-player ' + (turn === 'white' ? 'active' : 'inactive');
-    document.getElementById('mobile-name-white').textContent = 'WHITE' + (myColor === 'white' ? ' (YOU)' : '');
-    document.getElementById('mobile-status-white').textContent = turn === 'white' ? 'YOUR TURN' : '';
-  }
-  if (mb) {
-    mb.className = 'mobile-player ' + (turn === 'black' ? 'active' : 'inactive');
-    document.getElementById('mobile-name-black').textContent = 'BLACK' + (myColor === 'black' ? ' (YOU)' : '');
-    document.getElementById('mobile-status-black').textContent = turn === 'black' ? 'YOUR TURN' : '';
-  }
-  const log = document.getElementById('move-log-list');
-  if (log) {
-    log.innerHTML = '';
-    moveLog.forEach((m, i) => {
-      const d = document.createElement('div');
-      d.style.color = i%2===0 ? 'var(--green)' : 'var(--green-dim)';
-      const num = Math.floor(i/2)+1;
-      d.textContent = (i%2===0 ? num + '. ' : '    ') + m;
-      log.appendChild(d);
-    });
-    log.scrollTop = log.scrollHeight;
-  }
-}
-
-// ─── Room / Firebase ─────────────────────────────────────────
-function genRoomId() {
-  return Math.floor(100 + Math.random() * 900).toString();
-}
-
-window.createRoom = async function() {
-  showConnecting();
-  await ensureAuth();
-  // Silently clean up completed/abandoned games
-  try {
-    const snap = await get(ref(db, 'games'));
-    if (snap.exists()) {
-      const data = snap.val();
-      for (const [k, g] of Object.entries(data)) {
-        if (g.status === 'complete' || !g.players?.black) {
-          set(ref(db, 'games/' + k), null);
-          set(ref(db, 'chat/' + k), null);
-        }
-      }
+  // Try to complete a move
+  if (selected) {
+    const mv = validMoves.find(([mr,mc]) => mr===r && mc===c);
+    if (mv) {
+      doMove(selected[0], selected[1], r, c);
+      selected = null; validMoves = [];
+      return;
     }
-  } catch(e) { /* silent */ }
-  const id = genRoomId();
-  roomId = id;
-  myColor = 'white';
-  gameRef = ref(db, `games/${id}`);
-  const initialBoard = initBoard();
-  await set(gameRef, {
-    board: JSON.stringify(initialBoard),
-    turn: 'white',
-    status: 'waiting',
-    capturedByWhite: '[]',
-    capturedByBlack: '[]',
-    moveLog: '[]',
-    lastFrom: 'null',
-    lastTo:   'null',
-    players: { white: uid }
-  });
-  setupDisconnect();
-  document.getElementById('join-screen').classList.add('hidden');
-  document.getElementById('your-color-display').textContent = 'WHITE';
-  document.getElementById('room-code-display').textContent  = id;
-  document.getElementById('wait-screen').classList.remove('hidden');
-  startWaitDots();
-  listenToGame();
-};
+  }
 
-window.joinRoom = async function() {
-  const input = document.getElementById('room-input').value.trim();
-  if (!input) return;
-  showConnecting();
-  await ensureAuth();
-  const snap = await get(ref(db, `games/${input}`));
-  if (!snap.exists()) { alert('Room not found. Check the code and try again.'); hideConnecting(); return; }
-  const data = snap.val();
-  if (data.status !== 'waiting' || data.players?.black) { alert('Room is full or already in progress.'); hideConnecting(); return; }
-  roomId = input;
-  myColor = 'black';
-  gameRef = ref(db, `games/${input}`);
-  await update(gameRef, { 'players/black': uid, status: 'active' });
-  setupDisconnect();
-  document.getElementById('join-screen').classList.add('hidden');
-  listenToGame();
-};
-
-function setupDisconnect() {
-  const connRef = ref(db, `games/${roomId}/players/${myColor}`);
-  onDisconnect(connRef).set(null);
+  // Select own piece
+  const p = board[r][c];
+  if (p && pc(p) === myColor[0]) {
+    selected = [r, c];
+    validMoves = getLegalMoves(board, r, c);
+    renderBoard();
+  } else {
+    selected = null; validMoves = [];
+    renderBoard();
+  }
 }
 
+function doMove(fr, fc, tr, tc, promoChoice = null) {
+  const p = board[fr][fc];
+  const nb = board.map(row => [...row]);
+  nb[tr][tc] = p;
+  nb[fr][fc] = null;
+
+  // Castling rook
+  if (pt(p) === 'K' && Math.abs(tc - fc) === 2) {
+    const row = fr, ks = tc === 6;
+    nb[row][ks ? 5 : 3] = nb[row][ks ? 7 : 0];
+    nb[row][ks ? 7 : 0] = null;
+  }
+
+  // Capture tracking
+  const captured = board[tr][tc];
+  if (captured) {
+    if (myColor === 'white') capturedByWhite.push(captured);
+    else capturedByBlack.push(captured);
+  }
+
+  // Promotion
+  if (pt(p) === 'P' && (tr === 0 || tr === 7)) {
+    if (!promoChoice) {
+      pendingPromo = {
+        nb, fr, fc, tr, tc, p,
+        cbw: [...capturedByWhite],
+        cbb: [...capturedByBlack]
+      };
+      board = nb;
+      renderBoard();
+      showPromo(myColor[0]);
+      return;
+    }
+    nb[tr][tc] = myColor[0] + promoChoice;
+  }
+
+  const nextTurn = turn === 'white' ? 'black' : 'white';
+  const note = toNote(p, fr, fc, tr, tc, nb, promoChoice);
+  moveLog.push(note);
+
+  update(gameRef, {
+    board:           JSON.stringify(nb),
+    turn:            nextTurn,
+    capturedByWhite: JSON.stringify(capturedByWhite),
+    capturedByBlack: JSON.stringify(capturedByBlack),
+    moveLog:         JSON.stringify(moveLog),
+    lastFrom:        JSON.stringify([fr, fc]),
+    lastTo:          JSON.stringify([tr, tc]),
+  });
+}
+
+function toNote(p, fr, fc, tr, tc, nb, promo) {
+  const files = 'abcdefgh', ranks = '87654321';
+  const type = pt(p);
+  if (type === 'K' && Math.abs(tc - fc) === 2) return tc === 6 ? 'O-O' : 'O-O-O';
+  let s = type !== 'P' ? type : '';
+  if (board[tr][tc] || (type === 'P' && fc !== tc)) {
+    if (type === 'P') s += files[fc];
+    s += 'x';
+  }
+  s += files[tc] + ranks[tr];
+  if (promo) s += '=' + promo;
+  const oppCol = pc(p) === 'w' ? 'b' : 'w';
+  if (isInCheck(nb, oppCol)) s += '+';
+  return s;
+}
+
+function showPromo(col) {
+  const inner = document.getElementById('promo-inner');
+  inner.innerHTML = '';
+  ['Q','R','B','N'].forEach(t => {
+    const btn = document.createElement('button');
+    btn.className = 'pbtn';
+    btn.innerHTML = getPieceSVG(col + t);
+    btn.onclick = () => {
+      document.getElementById('promo').style.display = 'none';
+      const { nb, fr, fc, tr, tc, p, cbw, cbb } = pendingPromo;
+      capturedByWhite = cbw;
+      capturedByBlack = cbb;
+      pendingPromo = null;
+      nb[tr][tc] = col + t;
+      const nextTurn = turn === 'white' ? 'black' : 'white';
+      const note = toNote(p, fr, fc, tr, tc, nb, t);
+      moveLog.push(note);
+      update(gameRef, {
+        board:           JSON.stringify(nb),
+        turn:            nextTurn,
+        capturedByWhite: JSON.stringify(capturedByWhite),
+        capturedByBlack: JSON.stringify(capturedByBlack),
+        moveLog:         JSON.stringify(moveLog),
+        lastFrom:        JSON.stringify([fr, fc]),
+        lastTo:          JSON.stringify([tr, tc]),
+      });
+    };
+    inner.appendChild(btn);
+  });
+  document.getElementById('promo').style.display = 'flex';
+}
+
+// ── Firebase listener ─────────────────────────────────────────────────────────
 function listenToGame() {
-  onValue(gameRef, snap => {
+  if (gameListener) { off(gameRef); gameListener = null; }
+  gameListener = onValue(gameRef, snap => {
     try {
       if (!snap.exists()) return;
       const d = snap.val();
 
-      document.getElementById('status-white').textContent = d.players?.white ? 'online' : 'offline';
-      document.getElementById('status-black').textContent = d.players?.black ? 'online' : 'offline';
+      // Update online indicators
+      document.getElementById('conn-white').textContent = d.players?.white ? 'online' : 'waiting';
+      document.getElementById('conn-black').textContent = d.players?.black ? 'online' : 'waiting';
 
+      // Still waiting for opponent
       if (d.status === 'waiting') {
-        updateStatus('WAITING FOR OPPONENT...');
+        setStatus('WAITING FOR OPPONENT...');
         return;
       }
 
+      // Game is active or complete — hide lobby screens
       document.getElementById('wait-screen').classList.add('hidden');
       document.getElementById('join-screen').classList.add('hidden');
-      stopWaitDots();
-      if (!chatRef) initChat();
 
+      // Parse state
       board           = JSON.parse(d.board);
       turn            = d.turn;
       capturedByWhite = JSON.parse(d.capturedByWhite || '[]');
       capturedByBlack = JSON.parse(d.capturedByBlack || '[]');
-      moveLog         = JSON.parse(d.moveLog || '[]');
+      moveLog         = JSON.parse(d.moveLog  || '[]');
       lastFrom        = JSON.parse(d.lastFrom || 'null');
       lastTo          = JSON.parse(d.lastTo   || 'null');
       selected        = null;
       validMoves      = [];
       flipped         = (myColor === 'black');
 
+      updateCoords();
       renderBoard();
-      updateSidePanels();
+      updatePanels();
 
-      // ── Game already over (written by losing player) ──
+      // Start chat once
+      if (!chatRef) initChat();
+
+      // Game over?
       if (d.status === 'complete') {
         gameActive = false;
         if (!gameEnded) {
           gameEnded = true;
           const inChk = isInCheck(board, turn[0]);
-          if (inChk) {
-            // turn = the checkmated player
-            const iLost = (turn === myColor);
-            endGame(
-              iLost ? 'YOU LOSE' : 'YOU WIN!',
-              'Checkmate! ' + (turn === 'white' ? 'BLACK' : 'WHITE') + ' wins.'
-            );
-          } else {
-            endGame('DRAW', 'Stalemate — no legal moves.');
-          }
+          const iLost = turn === myColor;
+          if (inChk) endGame(iLost ? 'YOU LOSE' : 'YOU WIN!', 'Checkmate! ' + (turn==='white'?'BLACK':'WHITE') + ' wins.');
+          else        endGame('DRAW', 'Stalemate.');
         }
         return;
       }
 
-      // ── Live game ──
+      // Live game
       gameActive = true;
       const myTurn  = (turn === myColor);
       const inCheck = isInCheck(board, turn[0]);
 
-      if (myTurn) {
-        const hasLegal = hasLegalMoves(turn);
-        if (!hasLegal) {
-          if (inCheck) {
-            endGame('YOU LOSE', 'Checkmate! ' + (myColor === 'white' ? 'BLACK' : 'WHITE') + ' wins.');
-          } else {
-            endGame('DRAW', 'Stalemate — no legal moves.');
-          }
-          writeGameOver();
-          return;
+      if (myTurn && !hasAnyLegalMove(turn)) {
+        gameActive = false;
+        if (!gameEnded) {
+          gameEnded = true;
+          endGame(inCheck ? 'YOU LOSE' : 'DRAW', inCheck ? 'Checkmate! ' + (myColor==='white'?'BLACK':'WHITE') + ' wins.' : 'Stalemate.');
+          update(gameRef, { status: 'complete' });
         }
+        return;
       }
 
-      if (inCheck) {
-        updateStatus(myTurn ? 'CHECK! YOUR KING IS IN CHECK' : 'CHECK! ' + turn.toUpperCase() + ' IS IN CHECK');
-      } else {
-        updateStatus(myTurn ? 'YOUR TURN' : "OPPONENT'S TURN");
-      }
+      if (inCheck) setStatus(myTurn ? '⚠ CHECK! YOUR KING IS IN CHECK' : '⚠ CHECK! OPPONENT\'S KING IN CHECK');
+      else         setStatus(myTurn ? 'YOUR TURN — MAKE A MOVE' : "OPPONENT'S TURN...");
 
     } catch(e) {
-      console.error('[listenToGame error]', e);
+      console.error('listenToGame error:', e);
     }
   });
 }
 
+function endGame(title, msg) {
+  document.getElementById('go-title').textContent = title;
+  document.getElementById('go-msg').textContent   = msg;
+  document.getElementById('go-banner').style.display = 'block';
+  setStatus(title);
+}
+
+function updatePanels() {
+  document.getElementById('card-white').classList.toggle('active-turn', turn==='white');
+  document.getElementById('card-black').classList.toggle('active-turn', turn==='black');
+  document.getElementById('name-white').textContent = 'WHITE' + (myColor==='white' ? ' (YOU)' : '');
+  document.getElementById('name-black').textContent = 'BLACK' + (myColor==='black' ? ' (YOU)' : '');
+
+  const log = document.getElementById('move-log');
+  log.innerHTML = '';
+  moveLog.forEach((m, i) => {
+    const d = document.createElement('div');
+    d.style.color = i%2===0 ? 'var(--g)' : 'var(--gd)';
+    d.textContent = (i%2===0 ? Math.floor(i/2+1)+'. ' : '    ') + m;
+    log.appendChild(d);
+  });
+  log.scrollTop = log.scrollHeight;
+
+  // Mobile bar
+  ['white','black'].forEach(col => {
+    const el  = document.getElementById('mob-' + col);
+    const nm  = document.getElementById('mob-name-' + col[0]);
+    const st  = document.getElementById('mob-stat-' + col[0]);
+    if (!el) return;
+    el.className = 'mob-player ' + (turn===col ? 'active' : 'inactive');
+    if (nm) nm.textContent = col.toUpperCase() + (myColor===col ? ' (YOU)' : '');
+    if (st) st.textContent = turn===col ? 'YOUR TURN' : '';
+  });
+}
+
+function setStatus(msg) {
+  document.getElementById('status-bar').textContent = msg;
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
 function ensureAuth() {
   return new Promise(resolve => {
     if (uid) { resolve(); return; }
-    signInAnonymously(auth).then(() => {
-      onAuthStateChanged(auth, user => { if (user) { uid = user.uid; resolve(); } });
+    signInAnonymously(auth);
+    onAuthStateChanged(auth, user => {
+      if (user) { uid = user.uid; resolve(); }
     });
   });
 }
 
-function showConnecting() {
-  document.getElementById('join-options').style.display   = 'none';
-  document.getElementById('connecting-msg').style.display = 'block';
-}
-function hideConnecting() {
-  document.getElementById('join-options').style.display   = '';
-  document.getElementById('connecting-msg').style.display = 'none';
+function genCode() {
+  return String(Math.floor(100 + Math.random() * 900));
 }
 
-function startWaitDots() {
-  let n = 0;
-  const el = document.getElementById('wait-dots');
-  waitDotsInterval = setInterval(() => { el.textContent = '.'.repeat((++n % 4)); }, 500);
-}
-function stopWaitDots() {
-  clearInterval(waitDotsInterval);
-  const el = document.getElementById('wait-dots');
-  if (el) el.textContent = '';
-}
+// ── Room functions (window.* for onclick) ─────────────────────────────────────
+window.createRoom = async function() {
+  showConn();
+  await ensureAuth();
+  try {
+    const snap = await get(ref(db, 'games'));
+    if (snap.exists()) {
+      for (const [k, g] of Object.entries(snap.val()))
+        if (g.status === 'complete' || !g.players?.black)
+          set(ref(db, 'games/' + k), null);
+    }
+  } catch(e) {}
 
-window.copyRoomCode = function() {
-  navigator.clipboard.writeText(roomId);
-  const el = document.getElementById('share-room-code');
+  const id = genCode();
+  roomId = id;
+  myColor = 'white';
+  gameRef = ref(db, `games/${id}`);
+
+  await set(gameRef, {
+    status:          'waiting',
+    board:           JSON.stringify(initBoard()),
+    turn:            'white',
+    players:         { white: uid },
+    capturedByWhite: '[]',
+    capturedByBlack: '[]',
+    moveLog:         '[]',
+    lastFrom:        'null',
+    lastTo:          'null',
+  });
+
+  document.getElementById('share-code').textContent = id + '  (click to copy)';
+  document.getElementById('join-screen').classList.add('hidden');
+  document.getElementById('wait-screen').classList.remove('hidden');
+  listenToGame();
+};
+
+window.joinRoom = async function() {
+  const code = document.getElementById('room-inp').value.trim();
+  if (!code) { alert('Enter the 3-digit room code.'); return; }
+  showConn();
+  await ensureAuth();
+
+  const snap = await get(ref(db, `games/${code}`));
+  if (!snap.exists()) { alert('Room not found. Check the code.'); hideConn(); return; }
+  const d = snap.val();
+  if (d.status !== 'waiting' || d.players?.black) { alert('Room is full or game already started.'); hideConn(); return; }
+
+  roomId  = code;
+  myColor = 'black';
+  gameRef = ref(db, `games/${code}`);
+
+  await update(gameRef, { 'players/black': uid, status: 'active' });
+
+  document.getElementById('join-screen').classList.add('hidden');
+  listenToGame();
+};
+
+window.copyCode = function() {
+  navigator.clipboard.writeText(roomId).catch(() => {});
+  const el = document.getElementById('share-code');
   const orig = el.textContent;
-  el.textContent = '✓ Copied!';
-  setTimeout(() => el.textContent = orig, 1500);
+  el.textContent = roomId + '  ✓ copied!';
+  setTimeout(() => el.textContent = orig, 1800);
 };
 
 window.resetToLobby = function() {
-  if (gameRef) { off(gameRef); }
-  gameActive = false; gameEnded = false; myColor = null; roomId = null; gameRef = null; flipped = false;
-  board = []; selected = null; validMoves = []; turn = 'white';
+  gameActive = false; gameEnded = false;
+  myColor = null; roomId = null;
+  if (gameListener && gameRef) { off(gameRef); gameListener = null; }
+  gameRef = null;
+  board = initBoard(); turn = 'white'; flipped = false;
+  selected = null; validMoves = [];
   capturedByWhite = []; capturedByBlack = []; moveLog = [];
   lastFrom = null; lastTo = null;
-  document.getElementById('gameover-screen').classList.add('hidden');
-  const banner = document.getElementById('gameover-banner');
-  if (banner) banner.style.display = 'none';
+  document.getElementById('go-banner').style.display = 'none';
   document.getElementById('join-screen').classList.remove('hidden');
-  hideConnecting();
-  document.getElementById('room-input').value = '';
+  document.getElementById('wait-screen').classList.add('hidden');
+  hideConn();
+  document.getElementById('room-inp').value = '';
   cleanupChat();
-  buildBoardUI();
-  updateStatus('ENTER ROOM CODE OR CREATE NEW GAME');
+  renderBoard();
+  setStatus('ENTER ROOM CODE OR CREATE NEW GAME');
 };
 
-// ─── Chat ────────────────────────────────────────────────────
-let chatRef = null;
-let chatListener = null;
+function showConn() {
+  document.getElementById('join-opts').style.display = 'none';
+  document.getElementById('conn-msg').style.display  = 'block';
+}
+function hideConn() {
+  document.getElementById('join-opts').style.display = '';
+  document.getElementById('conn-msg').style.display  = 'none';
+}
 
+// ── Chat ──────────────────────────────────────────────────────────────────────
 function initChat() {
-  if (!gameRef || !roomId) return;
-  if (chatRef) return; // already initialised
+  if (chatRef) return;
   chatRef = ref(db, `chat/${roomId}`);
-  document.getElementById('chat-wrap').classList.add('active');
-  chatListener = onValue(chatRef, snap => {
-    const msgs = document.getElementById('chat-messages');
+  document.getElementById('chat-wrap').classList.add('on');
+  chatOff = onValue(chatRef, snap => {
+    const msgs = document.getElementById('chat-msgs');
     msgs.innerHTML = '';
     if (!snap.exists()) return;
-    const data = snap.val();
-    Object.keys(data).sort().forEach(k => {
-      const m = data[k];
-      const div = document.createElement('div');
-      div.className = 'chat-msg ' + (m.uid === uid ? 'mine' : 'theirs');
-      div.innerHTML = `<span class="chat-who">${m.color.toUpperCase()} </span><span class="chat-text">${escapeHtml(m.text)}</span>`;
-      msgs.appendChild(div);
+    Object.values(snap.val()).sort((a,b) => (a.ts||0)-(b.ts||0)).forEach(m => {
+      const d = document.createElement('div');
+      d.className = 'cmsg ' + (m.uid===uid ? 'me' : 'them');
+      d.textContent = (m.color==='white'?'W: ':'B: ') + m.text;
+      msgs.appendChild(d);
     });
     msgs.scrollTop = msgs.scrollHeight;
   });
-  const input = document.getElementById('chat-input');
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') sendChat(); });
-}
-
-function escapeHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  document.getElementById('chat-inp').addEventListener('keydown', e => {
+    if (e.key === 'Enter') sendChat();
+  });
 }
 
 window.sendChat = function() {
-  const input = document.getElementById('chat-input');
-  const text = input.value.trim();
+  const inp = document.getElementById('chat-inp');
+  const text = inp.value.trim();
   if (!text || !roomId) return;
-  input.value = '';
-  push(ref(db, `chat/${roomId}`), { uid, color: myColor, text, ts: serverTimestamp() });
+  inp.value = '';
+  push(ref(db, `chat/${roomId}`), { uid, color: myColor, text, ts: Date.now() });
 };
 
 function cleanupChat() {
-  if (chatListener && chatRef) off(chatRef, 'value', chatListener);
-  chatRef = null; chatListener = null;
-  document.getElementById('chat-wrap').classList.remove('active');
-  document.getElementById('chat-messages').innerHTML = '';
+  if (chatOff) chatOff();
+  chatRef = null; chatOff = null;
+  document.getElementById('chat-wrap').classList.remove('on');
+  document.getElementById('chat-msgs').innerHTML = '';
 }
 
-
-// ─── Cleanup old games ───────────────────────────────────────
-window.purgeOldGames = async function() {
-  const allGames = ref(db, 'games');
-  const snap = await get(allGames);
-  if (!snap.exists()) { alert('No games found.'); return; }
-  const data = snap.val();
-  const keys = Object.keys(data);
-  let deleted = 0;
-  for (const k of keys) {
-    const g = data[k];
-    // Delete completed games or games with no black player (abandoned)
-    if (g.status === 'complete' || !g.players?.black) {
-      await set(ref(db, 'games/' + k), null);
-      deleted++;
-    }
+// ── Matrix rain ───────────────────────────────────────────────────────────────
+(function() {
+  const canvas = document.getElementById('rain');
+  const ctx = canvas.getContext('2d');
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*';
+  const sz = 13;
+  let cols = Math.floor(canvas.width / sz);
+  let drops = Array(cols).fill(1);
+  function draw() {
+    ctx.fillStyle = 'rgba(6,10,6,0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#00ff88';
+    ctx.font = sz + 'px monospace';
+    drops.forEach((y, i) => {
+      ctx.fillText(chars[Math.floor(Math.random() * chars.length)], i*sz, y*sz);
+      if (y*sz > canvas.height && Math.random() > 0.975) drops[i] = 0;
+      drops[i]++;
+    });
   }
-  alert('Deleted ' + deleted + ' old game(s). ' + (keys.length - deleted) + ' active game(s) remain.');
-};
+  setInterval(draw, 45);
+  window.addEventListener('resize', () => {
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+    cols = Math.floor(canvas.width / sz);
+    drops = Array(cols).fill(1);
+  });
+})();
 
-// ─── Init ────────────────────────────────────────────────────
-buildBoardUI();
-updateStatus('ENTER ROOM CODE OR CREATE NEW GAME');
-
+// ── Boot ──────────────────────────────────────────────────────────────────────
+board = initBoard();
+buildBoard();   // create squares with click listeners — done exactly once
+renderBoard();  // draw starting position
+setStatus('ENTER ROOM CODE OR CREATE NEW GAME');
 </script>
 </body>
 </html>
