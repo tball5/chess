@@ -414,9 +414,11 @@ function drawArrow() {
   if (!lastFrom || !lastTo) return;
   const boardEl = document.getElementById('board');
   const sz = boardEl.clientWidth / 8;
+  // Board element itself is rotated 180deg for black, so arrow coords
+  // must always use the unflipped grid — the CSS rotation handles the flip.
   const vis = (r, c) => ({
-    x: (flipped ? 7-c : c) * sz + sz/2,
-    y: (flipped ? 7-r : r) * sz + sz/2
+    x: c * sz + sz/2,
+    y: r * sz + sz/2
   });
   const F = vis(lastFrom[0], lastFrom[1]);
   const T = vis(lastTo[0],   lastTo[1]);
